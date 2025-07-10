@@ -1,0 +1,5 @@
+streamlit
+lightweight-mmm
+numpy
+pandas
+matplotlib
