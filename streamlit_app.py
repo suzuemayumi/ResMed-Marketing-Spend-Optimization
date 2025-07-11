@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lightweight_mmm import LightweightMMM
 from lightweight_mmm import lightweight_mmm, optimize_media
 
 # Page configuration
@@ -39,9 +38,6 @@ if uploaded_file is not None:
     media_data = df[media_cols].values
 
     # Fit LightweightMMM model
-    model = LightweightMMM(media_prior=
-                                           np.ones(len(media_cols)))
-    model.fit(media=media_data, target=target)
     model = lightweight_mmm.LightweightMMM()
     model.fit(media=media_data,
               target=target,
@@ -69,16 +65,16 @@ if uploaded_file is not None:
 
     # Optimize button
     if st.button("Optimize"):
-        optimized_spend = model.optimize_budget(
-            total_budget=total_budget,
-            media_mix=np.ones(len(media_cols)) / len(media_cols)
         optimized_spend = optimize_media.find_optimal_budgets(
             n_time_periods=1,
             media_mix_model=model,
             budget=total_budget,
-            prices=np.ones(len(media_cols))
+            prices=np.ones(len(media_cols)),
         )
-        st.write("Optimized Spend Allocation", dict(zip(media_cols, optimized_spend)))
+        st.write(
+            "Optimized Spend Allocation",
+            dict(zip(media_cols, optimized_spend)),
+        )
 
     # Plot predicted conversions over time
     fig, ax = plt.subplots()
@@ -88,7 +84,6 @@ if uploaded_file is not None:
     st.pyplot(fig)
 
     # Contribution chart
-    contribution = model.get_contribution(media=media_data)
     base_media = np.zeros_like(media_data)
     base_pred = model.predict(media=base_media)
     contribution = np.zeros_like(media_data, dtype=float)
