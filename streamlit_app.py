@@ -65,12 +65,13 @@ if uploaded_file is not None:
 
     # Optimize button
     if st.button("Optimize"):
-        optimized_spend = optimize_media.find_optimal_budgets(
+        solution, _, _ = optimize_media.find_optimal_budgets(
             n_time_periods=1,
             media_mix_model=model,
             budget=total_budget,
             prices=np.ones(len(media_cols)),
         )
+        optimized_spend = np.round(solution.x.reshape(-1), 2)
         st.write(
             "Optimized Spend Allocation",
             dict(zip(media_cols, optimized_spend)),
