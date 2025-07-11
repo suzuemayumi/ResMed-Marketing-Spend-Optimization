@@ -1,5 +1,5 @@
-streamlit
-lightweight-mmm
-numpy
-pandas
-matplotlib
+streamlit==1.24.0
+lightweight-mmm==0.1.9
+numpy==1.26.4
+pandas==2.1.4
+matplotlib==3.6.1
