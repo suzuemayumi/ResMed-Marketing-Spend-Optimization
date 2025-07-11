@@ -2,28 +2,27 @@
 
 # ResMed Marketing Spend Optimization
 
-This project uses Streamlit to visualize and analyze marketing spend data. Follow the steps below to get the application running locally.
+This repository contains a lightweight Streamlit application for exploring marketing channel performance and building media mix models with the `lightweight-mmm` library.
 
-## Setup
+## Prerequisites
 
-1. **Create a virtual environment** (recommended):
+- Python 3.11 (confirmed compatible with `lightweight-mmm`)
 
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
+## Installation
 
-2. **Install dependencies**:
+Create and activate a virtual environment, then install the dependencies:
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-3. **Launch the Streamlit app**:
+Launch the Streamlit app with:
 
-   ```bash
-   streamlit run streamlit_app.py
-   ```
+```bash
+streamlit run streamlit_app.py
+```
 
 ## Data Requirements
 
