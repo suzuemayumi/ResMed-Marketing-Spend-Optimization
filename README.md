@@ -7,8 +7,10 @@ This repository contains a lightweight Streamlit application for exploring marke
 ## Prerequisites
 
 - Python 3.11 (confirmed compatible with `lightweight-mmm`)
-- JAX and jaxlib pinned to **0.4.19** to avoid compatibility issues
-
+- JAX and jaxlib pinned to **0.4.19** to avoid compatibility issues. Older
+   releases of `lightweight-mmm` call `jnp.where` with keyword arguments, which
+   is incompatible with JAX 0.4+. The Streamlit app includes a small monkey patch
+   so you do not need to downgrade JAX.
 ## Installation
 
 Create and activate a virtual environment, then install the dependencies:
