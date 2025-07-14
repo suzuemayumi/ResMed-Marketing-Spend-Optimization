@@ -34,8 +34,8 @@ if uploaded_file is not None:
     st.write(df.head())
 
     media_cols = ["search_cost", "video_cost", "meta_cost"]
-    target = df["conversion"].values
-    media_data = df[media_cols].values
+    target = df["conversion"].astype(float).values
+    media_data = df[media_cols].astype(float).values
 
     # Fit LightweightMMM model
     model = lightweight_mmm.LightweightMMM()
