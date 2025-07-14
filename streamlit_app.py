@@ -75,7 +75,9 @@ st.sidebar.write(
     "Upload a CSV or Excel file with columns: Date, conversion, search_cost, video_cost, meta_cost."
 )
 
-total_budget = st.sidebar.number_input("Total Budget", min_value=0.0, value=1000.0, step=100.0)
+total_budget = st.sidebar.number_input(
+    "Total Budget", min_value=0.0, value=1000.0, step=100.0
+)
 
 # File uploader
 uploaded_file = st.file_uploader("Upload marketing data", type=["csv", "xlsx", "xls"])
@@ -98,9 +100,7 @@ if uploaded_file is not None:
 
     # Fit LightweightMMM model
     model = lightweight_mmm.LightweightMMM()
-    model.fit(media=media_data,
-              target=target,
-              media_prior=np.ones(len(media_cols)))
+    model.fit(media=media_data, target=target, media_prior=np.ones(len(media_cols)))
 
     st.success("Model fitted")
 
@@ -112,8 +112,10 @@ if uploaded_file is not None:
     st.subheader("Adjust Future Spend")
     future_spend = {
         col: st.slider(
-            f"{col.replace('_cost', '').title()} Spend", min_value=0.0,
-            max_value=float(total_budget), value=float(df[col].iloc[-1])
+            f"{col.replace('_cost', '').title()} Spend",
+            min_value=0.0,
+            max_value=float(total_budget),
+            value=float(df[col].iloc[-1]),
         )
         for col in media_cols
     }
@@ -145,12 +147,12 @@ if uploaded_file is not None:
 
     # Contribution chart
     base_media = np.zeros_like(media_data)
-    base_pred = model.predict(media=base_media)
+    base_pred = model.predict(media=base_media).mean(axis=0)
     contribution = np.zeros_like(media_data, dtype=float)
     for i in range(len(media_cols)):
         temp = np.zeros_like(media_data)
         temp[:, i] = media_data[:, i]
-        pred_i = model.predict(media=temp)
+        pred_i = model.predict(media=temp).mean(axis=0)
         contribution[:, i] = pred_i - base_pred
 
     fig2, ax2 = plt.subplots()
