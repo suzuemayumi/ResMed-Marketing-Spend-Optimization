@@ -4,7 +4,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from lightweight_mmm import lightweight_mmm, optimize_media
+from lightweight_mmm import media_transforms
+import jax.numpy as jnp
 
+# ---------------------------------------------------------------------------
+# Compatibility patch for JAX 0.4+ where `jnp.where` no longer accepts keyword
+# arguments for `x` and `y`. Older versions of `lightweight_mmm` still call the
+# function using keywords, so we monkey patch the helper used during model fit
+# to avoid a ``TypeError``.
+# ---------------------------------------------------------------------------
+def _apply_exponent_safe(data, exponent):
+    """Replicates media_transforms.apply_exponent_safe without kw args."""
+    exponent_safe = jnp.where(data == 0, 1, data) ** exponent
+    return jnp.where(data == 0, 0, exponent_safe - 1)
+
+# Replace the library's implementation if present
+if hasattr(media_transforms, "apply_exponent_safe"):
+    media_transforms.apply_exponent_safe = _apply_exponent_safe
 # Page configuration
 st.set_page_config(page_title="Marketing Spend Optimization")
 
