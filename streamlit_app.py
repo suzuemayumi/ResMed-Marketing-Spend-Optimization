@@ -18,9 +18,18 @@ def _apply_exponent_safe(data, exponent):
     exponent_safe = jnp.where(data == 0, 1, data) ** exponent
     return jnp.where(data == 0, 0, exponent_safe - 1)
 
+def _hill(data, half_max_effective_concentration, slope):
+    save_transform = _apply_exponent_safe(
+        data=data / half_max_effective_concentration,
+        exponent=-slope,
+    )
+    return jnp.where(save_transform == 0, 0, 1.0 / (1 + save_transform))
+
 # Replace the library's implementation if present
 if hasattr(media_transforms, "apply_exponent_safe"):
     media_transforms.apply_exponent_safe = _apply_exponent_safe
+if hasattr(media_transforms, "hill"):
+    media_transforms.hill = _hill
 # Page configuration
 st.set_page_config(page_title="Marketing Spend Optimization")
 
