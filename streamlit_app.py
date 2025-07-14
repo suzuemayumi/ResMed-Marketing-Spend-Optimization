@@ -30,6 +30,40 @@ if hasattr(media_transforms, "apply_exponent_safe"):
     media_transforms.apply_exponent_safe = _apply_exponent_safe
 if hasattr(media_transforms, "hill"):
     media_transforms.hill = _hill
+
+# ---------------------------------------------------------------------------
+# Additional compatibility fix for ``jnp.reshape`` on older versions of
+# ``lightweight_mmm``. In JAX 0.4+, ``jnp.reshape`` no longer accepts the
+# ``newshape`` keyword argument. The library uses this keyword in its internal
+# optimization helper. We monkey patch the function to ensure compatibility.
+# ---------------------------------------------------------------------------
+import functools
+import jax
+
+
+@functools.partial(
+    jax.jit,
+    static_argnames=("media_mix_model", "media_input_shape", "target_scaler", "media_scaler"),
+)
+def _objective_function(extra_features, media_mix_model, media_input_shape, media_gap,
+                        target_scaler, media_scaler, geo_ratio, seed, media_values):
+    if hasattr(media_mix_model, "n_geos") and media_mix_model.n_geos > 1:
+        media_values = geo_ratio * jnp.expand_dims(media_values, axis=-1)
+    media_values = jnp.tile(media_values / media_input_shape[0], reps=media_input_shape[0])
+    media_values = jnp.reshape(media_values, media_input_shape)
+    media_values = media_scaler.transform(media_values)
+    return -jnp.sum(
+        media_mix_model.predict(
+            media=media_values.reshape(media_input_shape),
+            extra_features=extra_features,
+            media_gap=media_gap,
+            target_scaler=target_scaler,
+            seed=seed,
+        ).mean(axis=0)
+    )
+
+if hasattr(optimize_media, "_objective_function"):
+    optimize_media._objective_function = _objective_function
 # Page configuration
 st.set_page_config(page_title="Marketing Spend Optimization")
 
