@@ -72,7 +72,7 @@ if uploaded_file is not None:
 
     # Predict historical conversions
     predictions = model.predict(media=media_data).mean(axis=0)
-df["predicted_conversions"] = predictions
+    df["predicted_conversions"] = predictions
 
     # Future spend sliders
     st.subheader("Adjust Future Spend")
