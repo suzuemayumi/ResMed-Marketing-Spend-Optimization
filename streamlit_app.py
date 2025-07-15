@@ -142,6 +142,9 @@ if uploaded_file is not None:
     fig, ax = plt.subplots()
     ax.plot(df["Date"], df["predicted_conversions"], label="Predicted")
     ax.plot(df["Date"], df["conversion"], label="Actual", alpha=0.5)
+    ax.set_title("Predicted vs Actual Conversions")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Conversions")
     ax.legend()
     st.pyplot(fig)
 
@@ -158,5 +161,8 @@ if uploaded_file is not None:
     fig2, ax2 = plt.subplots()
     for i, col in enumerate(media_cols):
         ax2.plot(df["Date"], contribution[:, i], label=col.replace("_cost", ""))
+    ax2.set_title("Media Channel Contribution to Conversions")
+    ax2.set_xlabel("Date")
+    ax2.set_ylabel("Estimated Contribution")
     ax2.legend()
     st.pyplot(fig2)
