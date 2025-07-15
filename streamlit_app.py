@@ -110,15 +110,47 @@ if uploaded_file is not None:
 
     # Future spend sliders
     st.subheader("Adjust Future Spend")
-    future_spend = {
-        col: st.slider(
-            f"{col.replace('_cost', '').title()} Spend",
+    spend_ranges = {col: (df[col].min(), df[col].max()) for col in media_cols}
+    diminish_points = {col: df[col].quantile(0.9) for col in media_cols}
+    future_spend = {}
+    for col in media_cols:
+        col_title = col.replace("_cost", "").title()
+        slider_key = f"{col}_slider"
+        input_key = f"{col}_input"
+        if slider_key not in st.session_state:
+            st.session_state[slider_key] = float(df[col].iloc[-1])
+        if input_key not in st.session_state:
+            st.session_state[input_key] = float(df[col].iloc[-1])
+
+        st.slider(
+            f"{col_title} Spend",
             min_value=0.0,
             max_value=float(total_budget),
-            value=float(df[col].iloc[-1]),
+            value=st.session_state[slider_key],
+            key=slider_key,
         )
-        for col in media_cols
-    }
+        st.number_input(
+            f"{col_title} Spend Value",
+            min_value=0.0,
+            value=st.session_state[slider_key],
+            key=input_key,
+        )
+
+        if st.session_state[input_key] != st.session_state[slider_key]:
+            st.session_state[slider_key] = st.session_state[input_key]
+
+        val = st.session_state[slider_key]
+        if val < spend_ranges[col][0] or val > spend_ranges[col][1]:
+            st.warning(
+                f"{col_title} spend outside historical range "
+                f"({spend_ranges[col][0]:.2f} - {spend_ranges[col][1]:.2f})"
+            )
+        elif val > diminish_points[col]:
+            st.info(
+                f"{col_title} spend exceeds estimated diminishing return "
+                f"point ({diminish_points[col]:.2f})"
+            )
+        future_spend[col] = val
 
     future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
     future_pred = model.predict(media=future_media)[0]

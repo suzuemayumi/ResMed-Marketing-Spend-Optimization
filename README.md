@@ -27,6 +27,15 @@ Launch the Streamlit app with:
 streamlit run streamlit_app.py
 ```
 
+## Usage Notes
+
+When the application loads your dataset, you can adjust future marketing spend
+for each channel using interactive sliders **or** by typing an exact value into
+the accompanying number input. If the entered amount falls outside the
+historical range of your data, the app will display a warning. Values above the
+estimated 90th percentile for a channel trigger an informational message that
+spend may suffer from diminishing returns.
+
 ## Data Requirements
 
 The app expects a CSV or Excel file containing the following columns:
