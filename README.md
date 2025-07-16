@@ -31,8 +31,9 @@ streamlit run streamlit_app.py
 
 When the application loads your dataset, you can adjust future marketing spend
 for each channel using interactive sliders **or** by typing an exact value into
-the accompanying number input. Predicted conversions update automatically as
-you modify the spend values. If the entered amount falls outside the historical
+the accompanying number input. Model predictions no longer update while you
+adjust spend. Instead, the prediction and optimized allocation are calculated
+when you click **Optimize**. If the entered amount falls outside the historical
 range of your data, the app will display a warning. Values above the estimated
 90th percentile for a channel trigger an informational message that spend may
 suffer from diminishing returns.
@@ -40,6 +41,9 @@ suffer from diminishing returns.
 Each slider also includes a **Lock** checkbox. Locked channels keep their
 specified spend during optimization, allocating any remaining budget across the
 other unlocked channels.
+
+Progress bars appear while your data is loaded and when optimization runs so
+you can track the current status.
 
 ## Data Requirements
 
