@@ -87,13 +87,34 @@ if hasattr(optimize_media, "_objective_function"):
     optimize_media._objective_function = _objective_function
 
 
-def find_optimal_budgets_with_locks(model, budget, prices, locked_spend,
-                                    bounds_lower_pct=0.2,
-                                    bounds_upper_pct=0.2,
-                                    max_iterations=200,
-                                    solver_func_tolerance=1e-6,
-                                    solver_step_size=1.4901161193847656e-08):
-    """Wrapper around optimize_media.find_optimal_budgets that supports locks."""
+def find_optimal_budgets_with_locks(
+    model,
+    budget,
+    prices,
+    locked_spend,
+    bounds_lower_pct=0.2,
+    bounds_upper_pct=0.2,
+    max_iterations=200,
+    solver_func_tolerance=1e-6,
+    solver_step_size=1.4901161193847656e-08,
+    progress_callback=None,
+):
+    """Wrapper around optimize_media.find_optimal_budgets that supports locks.
+
+    Parameters
+    ----------
+    model : LightweightMMM
+        Trained media mix model.
+    budget : float
+        Total budget to distribute.
+    prices : array-like
+        Channel spend multipliers.
+    locked_spend : dict
+        Mapping of channel index to locked spend value.
+    progress_callback : callable, optional
+        Function called with a float between 0 and 1 after each iteration to
+        update a progress indicator in the UI.
+    """
     n_time_periods = 1
     jax.config.update("jax_enable_x64", True)
     if isinstance(bounds_lower_pct, float):
@@ -135,11 +156,28 @@ def find_optimal_budgets_with_locks(model, budget, prices, locked_spend,
     else:
         average_per_time = model.media.mean(axis=0)
         geo_ratio = average_per_time / jnp.expand_dims(
-            average_per_time.sum(axis=-1), axis=-1)
+            average_per_time.sum(axis=-1), axis=-1
+        )
     media_input_shape = (n_time_periods, *model.media.shape[1:])
     partial_obj = functools.partial(
-        optimize_media._objective_function, None, model,
-        media_input_shape, None, None, media_scaler, geo_ratio, None)
+        optimize_media._objective_function,
+        None,
+        model,
+        media_input_shape,
+        None,
+        None,
+        media_scaler,
+        geo_ratio,
+        None,
+    )
+
+    iteration = 0
+
+    def _cb(_x):
+        nonlocal iteration
+        iteration += 1
+        if progress_callback is not None:
+            progress_callback(min(iteration / max_iterations, 1.0))
 
     solution = optimize.minimize(
         fun=partial_obj,
@@ -147,6 +185,7 @@ def find_optimal_budgets_with_locks(model, budget, prices, locked_spend,
         bounds=bounds,
         method="SLSQP",
         jac="3-point",
+        callback=_cb,
         options={
             "maxiter": max_iterations,
             "disp": True,
@@ -159,6 +198,8 @@ def find_optimal_budgets_with_locks(model, budget, prices, locked_spend,
             "args": (prices, budget),
         },
     )
+    if progress_callback is not None:
+        progress_callback(1.0)
     kpi_without_optim = optimize_media._objective_function(
         extra_features=None,
         media_mix_model=model,
@@ -173,6 +214,8 @@ def find_optimal_budgets_with_locks(model, budget, prices, locked_spend,
 
     jax.config.update("jax_enable_x64", False)
     return solution, kpi_without_optim, starting_values
+
+
 # Page configuration
 st.set_page_config(page_title="Marketing Spend Optimization")
 
@@ -192,13 +235,16 @@ total_budget = st.sidebar.number_input(
 uploaded_file = st.file_uploader("Upload marketing data", type=["csv", "xlsx", "xls"])
 
 if uploaded_file is not None:
+    progress = st.progress(0.0)
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
         df = pd.read_excel(uploaded_file)
+    progress.progress(0.2)
 
     df["Date"] = pd.to_datetime(df["Date"])
     df = df.sort_values("Date")
+    progress.progress(0.4)
 
     st.subheader("Raw Data")
     st.write(df.head())
@@ -207,15 +253,19 @@ if uploaded_file is not None:
     target = df["conversion"].astype(float).values
     media_data = df[media_cols].astype(float).values
 
-    # Fit LightweightMMM model
     model = lightweight_mmm.LightweightMMM()
-    model.fit(media=media_data, target=target, media_prior=np.ones(len(media_cols)))
+    with st.spinner("Fitting model..."):
+        model.fit(
+            media=media_data,
+            target=target,
+            media_prior=np.ones(len(media_cols)),
+        )
+    progress.progress(0.8)
 
-    st.success("Model fitted")
-
-    # Predict historical conversions
     predictions = model.predict(media=media_data).mean(axis=0)
     df["predicted_conversions"] = predictions
+    progress.progress(1.0)
+    progress.empty()
 
     # Future spend sliders
     st.subheader("Adjust Future Spend")
@@ -247,11 +297,7 @@ if uploaded_file is not None:
             value=st.session_state[slider_key],
             key=input_key,
         )
- codex/add-spend-lock-feature-and-optimize-budgets
         st.checkbox(f"Lock {col_title}", key=lock_key)
-
-        st.checkbox("Lock", key=lock_key)
- main
 
         if st.session_state[input_key] != st.session_state[slider_key]:
             st.session_state[slider_key] = st.session_state[input_key]
@@ -269,14 +315,6 @@ if uploaded_file is not None:
             )
         future_spend[col] = val
 
- codex/add-spend-lock-feature-and-optimize-budgets
-    if st.button("Run", key="run_prediction"):
-        future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
-        st.session_state["future_pred"] = model.predict(media=future_media)[0]
-
-    if "future_pred" in st.session_state:
-        st.metric("Predicted Future Conversions", st.session_state["future_pred"])
-
     # Optimize button
     if st.button("Optimize"):
         locked = {
@@ -288,12 +326,20 @@ if uploaded_file is not None:
         if locked_total > total_budget:
             st.error("Locked spend exceeds total budget")
         else:
+            progress_bar = st.progress(0.0)
+
+            def _update(pct):
+                progress_bar.progress(pct)
+
             solution, _, _ = find_optimal_budgets_with_locks(
                 model,
                 budget=total_budget,
                 prices=np.ones(len(media_cols)),
                 locked_spend=locked,
+                progress_callback=_update,
             )
+            progress_bar.empty()
+
             optimized_spend = np.round(solution.x.reshape(-1), 2)
             final_alloc = {
                 col: locked.get(i, optimized_spend[i])
@@ -301,38 +347,9 @@ if uploaded_file is not None:
             }
             st.write("Optimized Spend Allocation", final_alloc)
 
-    future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
-    st.session_state["future_pred"] = model.predict(media=future_media)[0]
-    st.metric("Predicted Future Conversions", st.session_state["future_pred"])
-
-    # Optimize button
-    if st.button("Optimize"):
-        solution, _, _ = optimize_media.find_optimal_budgets(
-            n_time_periods=1,
-            media_mix_model=model,
-            budget=total_budget,
-            prices=np.ones(len(media_cols)),
-        )
-        optimized_spend = np.round(solution.x.reshape(-1), 2)
-
-        locked_channels = [c for c in media_cols if st.session_state.get(f"{c}_lock")]
-        locked_budget = sum(future_spend[c] for c in locked_channels)
-        unlocked_channels = [c for c in media_cols if c not in locked_channels]
-        remaining_budget = max(total_budget - locked_budget, 0)
-        unlocked_sum = sum(
-            optimized_spend[media_cols.index(c)] for c in unlocked_channels
-        )
-        scale = remaining_budget / unlocked_sum if unlocked_sum else 0
-
-        final_spend = {}
-        for i, col in enumerate(media_cols):
-            if col in locked_channels:
-                final_spend[col] = future_spend[col]
-            else:
-                final_spend[col] = optimized_spend[i] * scale
-
-        st.write("Optimized Spend Allocation", final_spend)
- main
+            future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
+            future_pred = model.predict(media=future_media)[0]
+            st.metric("Predicted Future Conversions", future_pred)
 
     # Plot predicted conversions over time
     fig, ax = plt.subplots()
