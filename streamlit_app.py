@@ -176,12 +176,9 @@ if uploaded_file is not None:
             )
         future_spend[col] = val
 
-    if st.button("Run", key="run_prediction"):
-        future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
-        st.session_state["future_pred"] = model.predict(media=future_media)[0]
-
-    if "future_pred" in st.session_state:
-        st.metric("Predicted Future Conversions", st.session_state["future_pred"])
+    future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
+    st.session_state["future_pred"] = model.predict(media=future_media)[0]
+    st.metric("Predicted Future Conversions", st.session_state["future_pred"])
 
     # Optimize button
     if st.button("Optimize"):
