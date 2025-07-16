@@ -37,6 +37,10 @@ range of your data, the app will display a warning. Values above the estimated
 90th percentile for a channel trigger an informational message that spend may
 suffer from diminishing returns.
 
+Each slider also includes a **Lock** checkbox. Locked channels keep their
+specified spend during optimization, allocating any remaining budget across the
+other unlocked channels.
+
 ## Data Requirements
 
 The app expects a CSV or Excel file containing the following columns:
