@@ -4,7 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from lightweight_mmm import lightweight_mmm, optimize_media
-from lightweight_mmm import media_transforms
+from lightweight_mmm import media_transforms, preprocessing
+from scipy import optimize
 import jax.numpy as jnp
 
 # ---------------------------------------------------------------------------
@@ -64,6 +65,94 @@ def _objective_function(extra_features, media_mix_model, media_input_shape, medi
 
 if hasattr(optimize_media, "_objective_function"):
     optimize_media._objective_function = _objective_function
+
+
+def find_optimal_budgets_with_locks(model, budget, prices, locked_spend,
+                                    bounds_lower_pct=0.2,
+                                    bounds_upper_pct=0.2,
+                                    max_iterations=200,
+                                    solver_func_tolerance=1e-6,
+                                    solver_step_size=1.4901161193847656e-08):
+    """Wrapper around optimize_media.find_optimal_budgets that supports locks."""
+    n_time_periods = 1
+    jax.config.update("jax_enable_x64", True)
+    if isinstance(bounds_lower_pct, float):
+        bounds_lower_pct = jnp.repeat(bounds_lower_pct, len(prices))
+    else:
+        bounds_lower_pct = jnp.array(bounds_lower_pct)
+    if isinstance(bounds_upper_pct, float):
+        bounds_upper_pct = jnp.repeat(bounds_upper_pct, len(prices))
+    else:
+        bounds_upper_pct = jnp.array(bounds_upper_pct)
+
+    base_bounds = optimize_media._get_lower_and_upper_bounds(
+        media=model.media,
+        n_time_periods=n_time_periods,
+        lower_pct=bounds_lower_pct,
+        upper_pct=bounds_upper_pct,
+        media_scaler=None,
+    )
+
+    lb = np.array(base_bounds.lb)
+    ub = np.array(base_bounds.ub)
+    starting_values = optimize_media._generate_starting_values(
+        n_time_periods=n_time_periods,
+        media=model.media,
+        media_scaler=None,
+        budget=budget,
+        prices=prices,
+    )
+
+    for idx, spend in locked_spend.items():
+        lb[idx] = spend
+        ub[idx] = spend
+        starting_values[idx] = spend
+
+    bounds = optimize.Bounds(lb=lb, ub=ub)
+    media_scaler = preprocessing.CustomScaler(multiply_by=1, divide_by=1)
+    if model.n_geos == 1:
+        geo_ratio = 1.0
+    else:
+        average_per_time = model.media.mean(axis=0)
+        geo_ratio = average_per_time / jnp.expand_dims(
+            average_per_time.sum(axis=-1), axis=-1)
+    media_input_shape = (n_time_periods, *model.media.shape[1:])
+    partial_obj = functools.partial(
+        optimize_media._objective_function, None, model,
+        media_input_shape, None, None, media_scaler, geo_ratio, None)
+
+    solution = optimize.minimize(
+        fun=partial_obj,
+        x0=starting_values,
+        bounds=bounds,
+        method="SLSQP",
+        jac="3-point",
+        options={
+            "maxiter": max_iterations,
+            "disp": True,
+            "ftol": solver_func_tolerance,
+            "eps": solver_step_size,
+        },
+        constraints={
+            "type": "eq",
+            "fun": optimize_media._budget_constraint,
+            "args": (prices, budget),
+        },
+    )
+    kpi_without_optim = optimize_media._objective_function(
+        extra_features=None,
+        media_mix_model=model,
+        media_input_shape=media_input_shape,
+        media_gap=None,
+        target_scaler=None,
+        media_scaler=media_scaler,
+        seed=None,
+        geo_ratio=geo_ratio,
+        media_values=starting_values,
+    )
+
+    jax.config.update("jax_enable_x64", False)
+    return solution, kpi_without_optim, starting_values
 # Page configuration
 st.set_page_config(page_title="Marketing Spend Optimization")
 
@@ -135,6 +224,8 @@ if uploaded_file is not None:
             value=st.session_state[slider_key],
             key=input_key,
         )
+        lock_key = f"{col}_lock"
+        st.checkbox(f"Lock {col_title}", key=lock_key)
 
         if st.session_state[input_key] != st.session_state[slider_key]:
             st.session_state[slider_key] = st.session_state[input_key]
@@ -158,17 +249,27 @@ if uploaded_file is not None:
 
     # Optimize button
     if st.button("Optimize"):
-        solution, _, _ = optimize_media.find_optimal_budgets(
-            n_time_periods=1,
-            media_mix_model=model,
-            budget=total_budget,
-            prices=np.ones(len(media_cols)),
-        )
-        optimized_spend = np.round(solution.x.reshape(-1), 2)
-        st.write(
-            "Optimized Spend Allocation",
-            dict(zip(media_cols, optimized_spend)),
-        )
+        locked = {
+            i: future_spend[col]
+            for i, col in enumerate(media_cols)
+            if st.session_state.get(f"{col}_lock")
+        }
+        locked_total = sum(locked.values())
+        if locked_total > total_budget:
+            st.error("Locked spend exceeds total budget")
+        else:
+            solution, _, _ = find_optimal_budgets_with_locks(
+                model,
+                budget=total_budget,
+                prices=np.ones(len(media_cols)),
+                locked_spend=locked,
+            )
+            optimized_spend = np.round(solution.x.reshape(-1), 2)
+            final_alloc = {
+                col: locked.get(i, optimized_spend[i])
+                for i, col in enumerate(media_cols)
+            }
+            st.write("Optimized Spend Allocation", final_alloc)
 
     # Plot predicted conversions over time
     fig, ax = plt.subplots()
