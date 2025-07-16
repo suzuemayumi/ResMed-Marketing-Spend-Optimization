@@ -247,7 +247,11 @@ if uploaded_file is not None:
             value=st.session_state[slider_key],
             key=input_key,
         )
+ codex/add-spend-lock-feature-and-optimize-budgets
         st.checkbox(f"Lock {col_title}", key=lock_key)
+
+        st.checkbox("Lock", key=lock_key)
+ main
 
         if st.session_state[input_key] != st.session_state[slider_key]:
             st.session_state[slider_key] = st.session_state[input_key]
@@ -265,6 +269,7 @@ if uploaded_file is not None:
             )
         future_spend[col] = val
 
+ codex/add-spend-lock-feature-and-optimize-budgets
     if st.button("Run", key="run_prediction"):
         future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
         st.session_state["future_pred"] = model.predict(media=future_media)[0]
@@ -295,6 +300,39 @@ if uploaded_file is not None:
                 for i, col in enumerate(media_cols)
             }
             st.write("Optimized Spend Allocation", final_alloc)
+
+    future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
+    st.session_state["future_pred"] = model.predict(media=future_media)[0]
+    st.metric("Predicted Future Conversions", st.session_state["future_pred"])
+
+    # Optimize button
+    if st.button("Optimize"):
+        solution, _, _ = optimize_media.find_optimal_budgets(
+            n_time_periods=1,
+            media_mix_model=model,
+            budget=total_budget,
+            prices=np.ones(len(media_cols)),
+        )
+        optimized_spend = np.round(solution.x.reshape(-1), 2)
+
+        locked_channels = [c for c in media_cols if st.session_state.get(f"{c}_lock")]
+        locked_budget = sum(future_spend[c] for c in locked_channels)
+        unlocked_channels = [c for c in media_cols if c not in locked_channels]
+        remaining_budget = max(total_budget - locked_budget, 0)
+        unlocked_sum = sum(
+            optimized_spend[media_cols.index(c)] for c in unlocked_channels
+        )
+        scale = remaining_budget / unlocked_sum if unlocked_sum else 0
+
+        final_spend = {}
+        for i, col in enumerate(media_cols):
+            if col in locked_channels:
+                final_spend[col] = future_spend[col]
+            else:
+                final_spend[col] = optimized_spend[i] * scale
+
+        st.write("Optimized Spend Allocation", final_spend)
+ main
 
     # Plot predicted conversions over time
     fig, ax = plt.subplots()
