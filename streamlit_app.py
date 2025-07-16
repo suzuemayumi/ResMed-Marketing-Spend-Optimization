@@ -8,6 +8,7 @@ from lightweight_mmm import media_transforms, preprocessing
 from scipy import optimize
 import jax.numpy as jnp
 
+
 # ---------------------------------------------------------------------------
 # Compatibility patch for JAX 0.4+ where `jnp.where` no longer accepts keyword
 # arguments for `x` and `y`. Older versions of `lightweight_mmm` still call the
@@ -19,12 +20,14 @@ def _apply_exponent_safe(data, exponent):
     exponent_safe = jnp.where(data == 0, 1, data) ** exponent
     return jnp.where(data == 0, 0, exponent_safe - 1)
 
+
 def _hill(data, half_max_effective_concentration, slope):
     save_transform = _apply_exponent_safe(
         data=data / half_max_effective_concentration,
         exponent=-slope,
     )
     return jnp.where(save_transform == 0, 0, 1.0 / (1 + save_transform))
+
 
 # Replace the library's implementation if present
 if hasattr(media_transforms, "apply_exponent_safe"):
@@ -44,13 +47,29 @@ import jax
 
 @functools.partial(
     jax.jit,
-    static_argnames=("media_mix_model", "media_input_shape", "target_scaler", "media_scaler"),
+    static_argnames=(
+        "media_mix_model",
+        "media_input_shape",
+        "target_scaler",
+        "media_scaler",
+    ),
 )
-def _objective_function(extra_features, media_mix_model, media_input_shape, media_gap,
-                        target_scaler, media_scaler, geo_ratio, seed, media_values):
+def _objective_function(
+    extra_features,
+    media_mix_model,
+    media_input_shape,
+    media_gap,
+    target_scaler,
+    media_scaler,
+    geo_ratio,
+    seed,
+    media_values,
+):
     if hasattr(media_mix_model, "n_geos") and media_mix_model.n_geos > 1:
         media_values = geo_ratio * jnp.expand_dims(media_values, axis=-1)
-    media_values = jnp.tile(media_values / media_input_shape[0], reps=media_input_shape[0])
+    media_values = jnp.tile(
+        media_values / media_input_shape[0], reps=media_input_shape[0]
+    )
     media_values = jnp.reshape(media_values, media_input_shape)
     media_values = media_scaler.transform(media_values)
     return -jnp.sum(
@@ -62,6 +81,7 @@ def _objective_function(extra_features, media_mix_model, media_input_shape, medi
             seed=seed,
         ).mean(axis=0)
     )
+
 
 if hasattr(optimize_media, "_objective_function"):
     optimize_media._objective_function = _objective_function
@@ -176,7 +196,7 @@ if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
     else:
         df = pd.read_excel(uploaded_file)
-    
+
     df["Date"] = pd.to_datetime(df["Date"])
     df = df.sort_values("Date")
 
@@ -206,10 +226,13 @@ if uploaded_file is not None:
         col_title = col.replace("_cost", "").title()
         slider_key = f"{col}_slider"
         input_key = f"{col}_input"
+        lock_key = f"{col}_lock"
         if slider_key not in st.session_state:
             st.session_state[slider_key] = float(df[col].iloc[-1])
         if input_key not in st.session_state:
             st.session_state[input_key] = float(df[col].iloc[-1])
+        if lock_key not in st.session_state:
+            st.session_state[lock_key] = False
 
         st.slider(
             f"{col_title} Spend",
@@ -224,7 +247,6 @@ if uploaded_file is not None:
             value=st.session_state[slider_key],
             key=input_key,
         )
-        lock_key = f"{col}_lock"
         st.checkbox(f"Lock {col_title}", key=lock_key)
 
         if st.session_state[input_key] != st.session_state[slider_key]:
@@ -243,9 +265,12 @@ if uploaded_file is not None:
             )
         future_spend[col] = val
 
-    future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
-    future_pred = model.predict(media=future_media)[0]
-    st.metric("Predicted Future Conversions", future_pred)
+    if st.button("Run", key="run_prediction"):
+        future_media = np.array([future_spend[c] for c in media_cols]).reshape(1, -1)
+        st.session_state["future_pred"] = model.predict(media=future_media)[0]
+
+    if "future_pred" in st.session_state:
+        st.metric("Predicted Future Conversions", st.session_state["future_pred"])
 
     # Optimize button
     if st.button("Optimize"):
