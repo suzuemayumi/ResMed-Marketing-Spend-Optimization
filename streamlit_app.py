@@ -353,7 +353,7 @@ if uploaded_file is not None:
                 for i, col in enumerate(media_cols)
             }
             future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
-            future_pred = float(model.predict(media=future_media)[0])
+            future_pred = float(model.predict(media=future_media).mean(axis=0))
 
             st.session_state["optimized_results"] = {
                 "alloc": final_alloc,
