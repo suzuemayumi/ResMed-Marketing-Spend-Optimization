@@ -345,6 +345,10 @@ if uploaded_file is not None:
                 col: locked.get(i, optimized_spend[i])
                 for i, col in enumerate(media_cols)
             }
+            for i, col in enumerate(media_cols):
+                new_val = final_alloc[col]
+                st.session_state[f"{col}_slider"] = new_val
+                st.session_state[f"{col}_input"] = new_val
             st.write("Optimized Spend Allocation", final_alloc)
 
             future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
