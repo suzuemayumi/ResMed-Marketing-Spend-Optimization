@@ -284,6 +284,13 @@ if uploaded_file is not None:
         if lock_key not in st.session_state:
             st.session_state[lock_key] = False
 
+        if "optimized_results" in st.session_state:
+            opt_val = st.session_state["optimized_results"]["alloc"].get(
+                col, st.session_state[slider_key]
+            )
+            st.session_state[slider_key] = opt_val
+            st.session_state[input_key] = opt_val
+
         st.slider(
             f"{col_title} Spend",
             min_value=0.0,
@@ -345,15 +352,25 @@ if uploaded_file is not None:
                 col: locked.get(i, optimized_spend[i])
                 for i, col in enumerate(media_cols)
             }
-            for i, col in enumerate(media_cols):
-                new_val = final_alloc[col]
-                st.session_state[f"{col}_slider"] = new_val
-                st.session_state[f"{col}_input"] = new_val
-            st.write("Optimized Spend Allocation", final_alloc)
-
             future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
-            future_pred = model.predict(media=future_media)[0]
-            st.metric("Predicted Future Conversions", future_pred)
+            future_pred = float(model.predict(media=future_media)[0])
+
+            st.session_state["optimized_results"] = {
+                "alloc": final_alloc,
+                "future_pred": future_pred,
+            }
+
+            st.experimental_rerun()
+
+    if "optimized_results" in st.session_state:
+        st.write(
+            "Optimized Spend Allocation",
+            st.session_state["optimized_results"]["alloc"],
+        )
+        st.metric(
+            "Predicted Future Conversions",
+            st.session_state["optimized_results"]["future_pred"],
+        )
 
     # Plot predicted conversions over time
     fig, ax = plt.subplots()
