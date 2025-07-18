@@ -353,7 +353,13 @@ if uploaded_file is not None:
                 for i, col in enumerate(media_cols)
             }
             future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
-            future_pred = float(model.predict(media=future_media).mean(axis=0))
+            # ``model.predict`` returns a JAX array which cannot be directly cast
+            # to a Python ``float`` when it has a non-scalar shape. ``mean(axis=0)``
+            # yields an array with a single value, so we explicitly convert using
+            # ``np.asarray`` and ``item()`` to extract the scalar value.
+            future_pred = np.asarray(
+                model.predict(media=future_media).mean(axis=0)
+            ).item()
 
             st.session_state["optimized_results"] = {
                 "alloc": final_alloc,
