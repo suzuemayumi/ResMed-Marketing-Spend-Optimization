@@ -288,6 +288,7 @@ if uploaded_file is not None:
             opt_val = st.session_state["optimized_results"]["alloc"].get(
                 col, st.session_state[slider_key]
             )
+            opt_val = float(opt_val)
             st.session_state[slider_key] = opt_val
             st.session_state[input_key] = opt_val
 
@@ -349,7 +350,7 @@ if uploaded_file is not None:
 
             optimized_spend = np.round(solution.x.reshape(-1), 2)
             final_alloc = {
-                col: locked.get(i, optimized_spend[i])
+                col: float(locked.get(i, optimized_spend[i]))
                 for i, col in enumerate(media_cols)
             }
             future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
