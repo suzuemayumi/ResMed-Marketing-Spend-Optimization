@@ -294,14 +294,6 @@ if uploaded_file is not None:
         if lock_key not in st.session_state:
             st.session_state[lock_key] = False
 
-        if "optimized_results" in st.session_state:
-            opt_val = st.session_state["optimized_results"]["alloc"].get(
-                col, st.session_state[slider_key]
-            )
-            opt_val = float(opt_val)
-            st.session_state[slider_key] = opt_val
-            st.session_state[input_key] = opt_val
-
         st.slider(
             f"{col_title} Spend",
             min_value=0.0,
@@ -310,6 +302,7 @@ if uploaded_file is not None:
             key=slider_key,
             on_change=_sync_from_slider,
             args=(slider_key, input_key),
+            disabled=st.session_state[lock_key],
         )
         st.number_input(
             f"{col_title} Spend Value",
@@ -318,6 +311,7 @@ if uploaded_file is not None:
             key=input_key,
             on_change=_sync_from_input,
             args=(slider_key, input_key),
+            disabled=st.session_state[lock_key],
         )
         st.checkbox(f"Lock {col_title}", key=lock_key)
 
@@ -372,6 +366,10 @@ if uploaded_file is not None:
             future_pred = np.asarray(
                 model.predict(media=future_media).mean(axis=0)
             ).item()
+
+            for c in media_cols:
+                st.session_state[f"{c}_slider"] = final_alloc[c]
+                st.session_state[f"{c}_input"] = final_alloc[c]
 
             st.session_state["optimized_results"] = {
                 "alloc": final_alloc,
