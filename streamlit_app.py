@@ -45,6 +45,16 @@ import functools
 import jax
 
 
+def _sync_from_slider(slider_key: str, input_key: str) -> None:
+    """Update the number input when a slider changes."""
+    st.session_state[input_key] = st.session_state[slider_key]
+
+
+def _sync_from_input(slider_key: str, input_key: str) -> None:
+    """Update the slider when a number input changes."""
+    st.session_state[slider_key] = st.session_state[input_key]
+
+
 @functools.partial(
     jax.jit,
     static_argnames=(
@@ -298,17 +308,18 @@ if uploaded_file is not None:
             max_value=float(total_budget),
             value=st.session_state[slider_key],
             key=slider_key,
+            on_change=_sync_from_slider,
+            args=(slider_key, input_key),
         )
         st.number_input(
             f"{col_title} Spend Value",
             min_value=0.0,
             value=st.session_state[slider_key],
             key=input_key,
+            on_change=_sync_from_input,
+            args=(slider_key, input_key),
         )
         st.checkbox(f"Lock {col_title}", key=lock_key)
-
-        if st.session_state[input_key] != st.session_state[slider_key]:
-            st.session_state[slider_key] = st.session_state[input_key]
 
         val = st.session_state[slider_key]
         if val < spend_ranges[col][0] or val > spend_ranges[col][1]:
