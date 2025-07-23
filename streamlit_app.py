@@ -451,20 +451,20 @@ ax.legend()
 st.pyplot(fig)
 
     # Contribution chart
-    base_media = np.zeros_like(media_data)
-    base_pred = model.predict(media=base_media).mean(axis=0)
-    contribution = np.zeros_like(media_data, dtype=float)
-    for i in range(len(media_cols)):
-        temp = np.zeros_like(media_data)
-        temp[:, i] = media_data[:, i]
-        pred_i = model.predict(media=temp).mean(axis=0)
-        contribution[:, i] = pred_i - base_pred
+base_media = np.zeros_like(media_data)
+base_pred = model.predict(media=base_media).mean(axis=0)
+contribution = np.zeros_like(media_data, dtype=float)
+for i in range(len(media_cols)):
+    temp = np.zeros_like(media_data)
+    temp[:, i] = media_data[:, i]
+    pred_i = model.predict(media=temp).mean(axis=0)
+    contribution[:, i] = pred_i - base_pred
 
-    fig2, ax2 = plt.subplots()
-    for i, col in enumerate(media_cols):
-        ax2.plot(df["Date"], contribution[:, i], label=col.replace("_cost", ""))
-    ax2.set_title("Media Channel Contribution to Conversions")
-    ax2.set_xlabel("Date")
-    ax2.set_ylabel("Estimated Contribution")
-    ax2.legend()
-    st.pyplot(fig2)
+fig2, ax2 = plt.subplots()
+for i, col in enumerate(media_cols):
+    ax2.plot(df["Date"], contribution[:, i], label=col.replace("_cost", ""))
+ax2.set_title("Media Channel Contribution to Conversions")
+ax2.set_xlabel("Date")
+ax2.set_ylabel("Estimated Contribution")
+ax2.legend()
+st.pyplot(fig2)
