@@ -324,6 +324,7 @@ if uploaded_file is not None:
         st.number_input(
             f"{col_title} Spend Value",
             min_value=0.0,
+            max_value=float(total_budget),
             key=input_key,
             on_change=_sync_from_input,
             args=(slider_key, input_key),
@@ -358,6 +359,7 @@ if uploaded_file is not None:
                 st.number_input(
                     f"{col_title} Spend Value",
                     min_value=0.0,
+                    max_value=float(total_budget),
                     value=st.session_state[slider_key],
                     key=input_key,
                     on_change=_sync_from_input,
