@@ -286,7 +286,7 @@ if uploaded_file is not None:
 
     spend_ranges = {col: (df[col].min(), df[col].max()) for col in media_cols}
     diminish_points = {col: df[col].quantile(0.9) for col in media_cols}
-codex/improve-loading-speed-and-progress-bar
+
 
     future_spend = {}
 
