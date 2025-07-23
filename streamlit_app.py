@@ -430,7 +430,7 @@ if optimize_clicked:
 
             st.experimental_rerun()
 
-    if "optimized_results" in st.session_state:
+if "optimized_results" in st.session_state:
         st.write(
             "Optimized Spend Allocation",
             st.session_state["optimized_results"]["alloc"],
