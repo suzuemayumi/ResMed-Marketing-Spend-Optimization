@@ -442,13 +442,13 @@ if "optimized_results" in st.session_state:
 
     # Plot predicted conversions over time
 fig, ax = plt.subplots()
-    ax.plot(df["Date"], df["predicted_conversions"], label="Predicted")
-    ax.plot(df["Date"], df["conversion"], label="Actual", alpha=0.5)
-    ax.set_title("Predicted vs Actual Conversions")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Conversions")
-    ax.legend()
-    st.pyplot(fig)
+ax.plot(df["Date"], df["predicted_conversions"], label="Predicted")
+ax.plot(df["Date"], df["conversion"], label="Actual", alpha=0.5)
+ax.set_title("Predicted vs Actual Conversions")
+ax.set_xlabel("Date")
+ax.set_ylabel("Conversions")
+ax.legend()
+st.pyplot(fig)
 
     # Contribution chart
     base_media = np.zeros_like(media_data)
