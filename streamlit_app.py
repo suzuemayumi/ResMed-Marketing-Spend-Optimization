@@ -334,7 +334,7 @@ if uploaded_file is not None:
         st.checkbox(f"Lock {col_title}", key=lock_key)
 main
 
-    with st.form("optimization_form"):
+with st.form("optimization_form"):
         st.subheader("Adjust Future Spend")
         future_spend = {}
         for col in media_cols:
