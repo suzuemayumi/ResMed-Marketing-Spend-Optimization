@@ -282,6 +282,17 @@ if uploaded_file is not None:
     spend_ranges = {col: (df[col].min(), df[col].max()) for col in media_cols}
     diminish_points = {col: df[col].quantile(0.9) for col in media_cols}
     future_spend = {}
+
+    # If we have optimized spend allocations stored from a previous run,
+    # update the slider defaults before creating the widgets. Streamlit
+    # requires any session state modifications to occur prior to widget
+    # instantiation.
+    if "optimized_results" in st.session_state:
+        for col in media_cols:
+            alloc_val = st.session_state["optimized_results"]["alloc"][col]
+            st.session_state[f"{col}_slider"] = alloc_val
+            st.session_state[f"{col}_input"] = alloc_val
+
     for col in media_cols:
         col_title = col.replace("_cost", "").title()
         slider_key = f"{col}_slider"
@@ -366,10 +377,6 @@ if uploaded_file is not None:
             future_pred = np.asarray(
                 model.predict(media=future_media).mean(axis=0)
             ).item()
-
-            for c in media_cols:
-                st.session_state[f"{c}_slider"] = final_alloc[c]
-                st.session_state[f"{c}_input"] = final_alloc[c]
 
             st.session_state["optimized_results"] = {
                 "alloc": final_alloc,
