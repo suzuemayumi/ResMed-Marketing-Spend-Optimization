@@ -451,7 +451,7 @@ ax.legend()
 st.pyplot(fig)
 
     # Contribution chart
-    base_media = np.zeros_like(media_data)
+base_media = np.zeros_like(media_data)
 base_pred = model.predict(media=base_media).mean(axis=0)
 contribution = np.zeros_like(media_data, dtype=float)
 for i in range(len(media_cols)):
