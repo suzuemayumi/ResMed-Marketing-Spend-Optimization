@@ -286,6 +286,53 @@ if uploaded_file is not None:
 
     spend_ranges = {col: (df[col].min(), df[col].max()) for col in media_cols}
     diminish_points = {col: df[col].quantile(0.9) for col in media_cols}
+codex/improve-loading-speed-and-progress-bar
+
+    future_spend = {}
+
+    # If we have optimized spend allocations stored from a previous run,
+    # update the slider defaults before creating the widgets. Streamlit
+    # requires any session state modifications to occur prior to widget
+    # instantiation.
+    if "optimized_results" in st.session_state:
+        for col in media_cols:
+            alloc_val = st.session_state["optimized_results"]["alloc"][col]
+            st.session_state[f"{col}_slider"] = alloc_val
+            st.session_state[f"{col}_input"] = alloc_val
+
+    for col in media_cols:
+        col_title = col.replace("_cost", "").title()
+        slider_key = f"{col}_slider"
+        input_key = f"{col}_input"
+        lock_key = f"{col}_lock"
+        if slider_key not in st.session_state:
+            st.session_state[slider_key] = float(df[col].iloc[-1])
+        if input_key not in st.session_state:
+            st.session_state[input_key] = float(df[col].iloc[-1])
+        if lock_key not in st.session_state:
+            st.session_state[lock_key] = False
+
+        st.slider(
+            f"{col_title} Spend",
+            min_value=0.0,
+            max_value=float(total_budget),
+            value=st.session_state[slider_key],
+            key=slider_key,
+            on_change=_sync_from_slider,
+            args=(slider_key, input_key),
+            disabled=st.session_state[lock_key],
+        )
+        st.number_input(
+            f"{col_title} Spend Value",
+            min_value=0.0,
+            value=st.session_state[slider_key],
+            key=input_key,
+            on_change=_sync_from_input,
+            args=(slider_key, input_key),
+            disabled=st.session_state[lock_key],
+        )
+        st.checkbox(f"Lock {col_title}", key=lock_key)
+main
 
     with st.form("optimization_form"):
         st.subheader("Adjust Future Spend")
@@ -375,10 +422,6 @@ if uploaded_file is not None:
             future_pred = np.asarray(
                 model.predict(media=future_media).mean(axis=0)
             ).item()
-
-            for c in media_cols:
-                st.session_state[f"{c}_slider"] = final_alloc[c]
-                st.session_state[f"{c}_input"] = final_alloc[c]
 
             st.session_state["optimized_results"] = {
                 "alloc": final_alloc,
