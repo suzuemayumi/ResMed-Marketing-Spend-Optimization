@@ -385,7 +385,7 @@ with st.form("optimization_form"):
 
         optimize_clicked = st.form_submit_button("Optimize")
 
-    if optimize_clicked:
+if optimize_clicked:
         locked = {
             i: future_spend[col]
             for i, col in enumerate(media_cols)
