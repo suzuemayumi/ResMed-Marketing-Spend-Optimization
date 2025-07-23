@@ -312,10 +312,11 @@ if uploaded_file is not None:
         if lock_key not in st.session_state:
             st.session_state[lock_key] = False
 
+        max_val = float(max(total_budget, spend_ranges[col][1], df[col].iloc[-1]))
         st.slider(
             f"{col_title} Spend",
             min_value=0.0,
-            max_value=float(total_budget),
+            max_value=max_val,
             key=slider_key,
             on_change=_sync_from_slider,
             args=(slider_key, input_key),
@@ -324,7 +325,7 @@ if uploaded_file is not None:
         st.number_input(
             f"{col_title} Spend Value",
             min_value=0.0,
-            max_value=float(total_budget),
+            max_value=max_val,
             key=input_key,
             on_change=_sync_from_input,
             args=(slider_key, input_key),
@@ -346,10 +347,11 @@ if uploaded_file is not None:
                 if lock_key not in st.session_state:
                     st.session_state[lock_key] = False
     
+                max_val = float(max(total_budget, spend_ranges[col][1], df[col].iloc[-1]))
                 st.slider(
                     f"{col_title} Spend",
                     min_value=0.0,
-                    max_value=float(total_budget),
+                    max_value=max_val,
                     value=st.session_state[slider_key],
                     key=slider_key,
                     on_change=_sync_from_slider,
@@ -359,7 +361,7 @@ if uploaded_file is not None:
                 st.number_input(
                     f"{col_title} Spend Value",
                     min_value=0.0,
-                    max_value=float(total_budget),
+                    max_value=max_val,
                     value=st.session_state[slider_key],
                     key=input_key,
                     on_change=_sync_from_input,
