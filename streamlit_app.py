@@ -226,6 +226,25 @@ def find_optimal_budgets_with_locks(
     return solution, kpi_without_optim, starting_values
 
 
+@st.cache_data(show_spinner=False)
+def _load_dataframe(uploaded_file) -> pd.DataFrame:
+    """Load the uploaded CSV or Excel file and sort by date."""
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+    df["Date"] = pd.to_datetime(df["Date"])
+    return df.sort_values("Date")
+
+
+@st.cache_resource(show_spinner=False)
+def _train_model(media_data: np.ndarray, target: np.ndarray, n_channels: int) -> lightweight_mmm.LightweightMMM:
+    """Fit and return a cached media mix model."""
+    model = lightweight_mmm.LightweightMMM()
+    model.fit(media=media_data, target=target, media_prior=np.ones(n_channels))
+    return model
+
+
 # Page configuration
 st.set_page_config(page_title="Marketing Spend Optimization")
 
@@ -246,14 +265,7 @@ uploaded_file = st.file_uploader("Upload marketing data", type=["csv", "xlsx", "
 
 if uploaded_file is not None:
     progress = st.progress(0.0)
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file)
-    progress.progress(0.2)
-
-    df["Date"] = pd.to_datetime(df["Date"])
-    df = df.sort_values("Date")
+    df = _load_dataframe(uploaded_file)
     progress.progress(0.4)
 
     st.subheader("Raw Data")
@@ -263,13 +275,8 @@ if uploaded_file is not None:
     target = df["conversion"].astype(float).values
     media_data = df[media_cols].astype(float).values
 
-    model = lightweight_mmm.LightweightMMM()
     with st.spinner("Fitting model..."):
-        model.fit(
-            media=media_data,
-            target=target,
-            media_prior=np.ones(len(media_cols)),
-        )
+        model = _train_model(media_data, target, len(media_cols))
     progress.progress(0.8)
 
     predictions = model.predict(media=media_data).mean(axis=0)
@@ -277,10 +284,10 @@ if uploaded_file is not None:
     progress.progress(1.0)
     progress.empty()
 
-    # Future spend sliders
-    st.subheader("Adjust Future Spend")
     spend_ranges = {col: (df[col].min(), df[col].max()) for col in media_cols}
     diminish_points = {col: df[col].quantile(0.9) for col in media_cols}
+codex/improve-loading-speed-and-progress-bar
+
     future_spend = {}
 
     # If we have optimized spend allocations stored from a previous run,
@@ -325,22 +332,60 @@ if uploaded_file is not None:
             disabled=st.session_state[lock_key],
         )
         st.checkbox(f"Lock {col_title}", key=lock_key)
+main
 
-        val = st.session_state[slider_key]
-        if val < spend_ranges[col][0] or val > spend_ranges[col][1]:
-            st.warning(
-                f"{col_title} spend outside historical range "
-                f"({spend_ranges[col][0]:.2f} - {spend_ranges[col][1]:.2f})"
-            )
-        elif val > diminish_points[col]:
-            st.info(
-                f"{col_title} spend exceeds estimated diminishing return "
-                f"point ({diminish_points[col]:.2f})"
-            )
-        future_spend[col] = val
+    with st.form("optimization_form"):
+        st.subheader("Adjust Future Spend")
+        future_spend = {}
+        for col in media_cols:
+            col_title = col.replace("_cost", "").title()
+            slider_key = f"{col}_slider"
+            input_key = f"{col}_input"
+            lock_key = f"{col}_lock"
+            if slider_key not in st.session_state:
+                st.session_state[slider_key] = float(df[col].iloc[-1])
+            if input_key not in st.session_state:
+                st.session_state[input_key] = float(df[col].iloc[-1])
+            if lock_key not in st.session_state:
+                st.session_state[lock_key] = False
 
-    # Optimize button
-    if st.button("Optimize"):
+            st.slider(
+                f"{col_title} Spend",
+                min_value=0.0,
+                max_value=float(total_budget),
+                value=st.session_state[slider_key],
+                key=slider_key,
+                on_change=_sync_from_slider,
+                args=(slider_key, input_key),
+                disabled=st.session_state[lock_key],
+            )
+            st.number_input(
+                f"{col_title} Spend Value",
+                min_value=0.0,
+                value=st.session_state[slider_key],
+                key=input_key,
+                on_change=_sync_from_input,
+                args=(slider_key, input_key),
+                disabled=st.session_state[lock_key],
+            )
+            st.checkbox(f"Lock {col_title}", key=lock_key)
+
+            val = st.session_state[slider_key]
+            if val < spend_ranges[col][0] or val > spend_ranges[col][1]:
+                st.warning(
+                    f"{col_title} spend outside historical range "
+                    f"({spend_ranges[col][0]:.2f} - {spend_ranges[col][1]:.2f})"
+                )
+            elif val > diminish_points[col]:
+                st.info(
+                    f"{col_title} spend exceeds estimated diminishing return "
+                    f"point ({diminish_points[col]:.2f})"
+                )
+            future_spend[col] = val
+
+        optimize_clicked = st.form_submit_button("Optimize")
+
+    if optimize_clicked:
         locked = {
             i: future_spend[col]
             for i, col in enumerate(media_cols)
