@@ -330,139 +330,137 @@ if uploaded_file is not None:
             disabled=st.session_state[lock_key],
         )
         st.checkbox(f"Lock {col_title}", key=lock_key)
-main
-
-with st.form("optimization_form"):
-        st.subheader("Adjust Future Spend")
-        future_spend = {}
-        for col in media_cols:
-            col_title = col.replace("_cost", "").title()
-            slider_key = f"{col}_slider"
-            input_key = f"{col}_input"
-            lock_key = f"{col}_lock"
-            if slider_key not in st.session_state:
-                st.session_state[slider_key] = float(df[col].iloc[-1])
-            if input_key not in st.session_state:
-                st.session_state[input_key] = float(df[col].iloc[-1])
-            if lock_key not in st.session_state:
-                st.session_state[lock_key] = False
-
-            st.slider(
-                f"{col_title} Spend",
-                min_value=0.0,
-                max_value=float(total_budget),
-                value=st.session_state[slider_key],
-                key=slider_key,
-                on_change=_sync_from_slider,
-                args=(slider_key, input_key),
-                disabled=st.session_state[lock_key],
-            )
-            st.number_input(
-                f"{col_title} Spend Value",
-                min_value=0.0,
-                value=st.session_state[slider_key],
-                key=input_key,
-                on_change=_sync_from_input,
-                args=(slider_key, input_key),
-                disabled=st.session_state[lock_key],
-            )
-            st.checkbox(f"Lock {col_title}", key=lock_key)
-
-            val = st.session_state[slider_key]
-            if val < spend_ranges[col][0] or val > spend_ranges[col][1]:
-                st.warning(
-                    f"{col_title} spend outside historical range "
-                    f"({spend_ranges[col][0]:.2f} - {spend_ranges[col][1]:.2f})"
+    with st.form("optimization_form"):
+            st.subheader("Adjust Future Spend")
+            future_spend = {}
+            for col in media_cols:
+                col_title = col.replace("_cost", "").title()
+                slider_key = f"{col}_slider"
+                input_key = f"{col}_input"
+                lock_key = f"{col}_lock"
+                if slider_key not in st.session_state:
+                    st.session_state[slider_key] = float(df[col].iloc[-1])
+                if input_key not in st.session_state:
+                    st.session_state[input_key] = float(df[col].iloc[-1])
+                if lock_key not in st.session_state:
+                    st.session_state[lock_key] = False
+    
+                st.slider(
+                    f"{col_title} Spend",
+                    min_value=0.0,
+                    max_value=float(total_budget),
+                    value=st.session_state[slider_key],
+                    key=slider_key,
+                    on_change=_sync_from_slider,
+                    args=(slider_key, input_key),
+                    disabled=st.session_state[lock_key],
                 )
-            elif val > diminish_points[col]:
-                st.info(
-                    f"{col_title} spend exceeds estimated diminishing return "
-                    f"point ({diminish_points[col]:.2f})"
+                st.number_input(
+                    f"{col_title} Spend Value",
+                    min_value=0.0,
+                    value=st.session_state[slider_key],
+                    key=input_key,
+                    on_change=_sync_from_input,
+                    args=(slider_key, input_key),
+                    disabled=st.session_state[lock_key],
                 )
-            future_spend[col] = val
-
-        optimize_clicked = st.form_submit_button("Optimize")
-
-if optimize_clicked:
-        locked = {
-            i: future_spend[col]
-            for i, col in enumerate(media_cols)
-            if st.session_state.get(f"{col}_lock")
-        }
-        locked_total = sum(locked.values())
-        if locked_total > total_budget:
-            st.error("Locked spend exceeds total budget")
-        else:
-            progress_bar = st.progress(0.0)
-
-            def _update(pct):
-                progress_bar.progress(pct)
-
-            solution, _, _ = find_optimal_budgets_with_locks(
-                model,
-                budget=total_budget,
-                prices=np.ones(len(media_cols)),
-                locked_spend=locked,
-                progress_callback=_update,
-            )
-            progress_bar.empty()
-
-            optimized_spend = np.round(solution.x.reshape(-1), 2)
-            final_alloc = {
-                col: float(locked.get(i, optimized_spend[i]))
+                st.checkbox(f"Lock {col_title}", key=lock_key)
+    
+                val = st.session_state[slider_key]
+                if val < spend_ranges[col][0] or val > spend_ranges[col][1]:
+                    st.warning(
+                        f"{col_title} spend outside historical range "
+                        f"({spend_ranges[col][0]:.2f} - {spend_ranges[col][1]:.2f})"
+                    )
+                elif val > diminish_points[col]:
+                    st.info(
+                        f"{col_title} spend exceeds estimated diminishing return "
+                        f"point ({diminish_points[col]:.2f})"
+                    )
+                future_spend[col] = val
+    
+            optimize_clicked = st.form_submit_button("Optimize")
+    
+    if optimize_clicked:
+            locked = {
+                i: future_spend[col]
                 for i, col in enumerate(media_cols)
+                if st.session_state.get(f"{col}_lock")
             }
-            future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
-            # ``model.predict`` returns a JAX array which cannot be directly cast
-            # to a Python ``float`` when it has a non-scalar shape. ``mean(axis=0)``
-            # yields an array with a single value, so we explicitly convert using
-            # ``np.asarray`` and ``item()`` to extract the scalar value.
-            future_pred = np.asarray(
-                model.predict(media=future_media).mean(axis=0)
-            ).item()
-
-            st.session_state["optimized_results"] = {
-                "alloc": final_alloc,
-                "future_pred": future_pred,
-            }
-
-            st.experimental_rerun()
-
-if "optimized_results" in st.session_state:
-        st.write(
-            "Optimized Spend Allocation",
-            st.session_state["optimized_results"]["alloc"],
-        )
-        st.metric(
-            "Predicted Future Conversions",
-            st.session_state["optimized_results"]["future_pred"],
-        )
-
-    # Plot predicted conversions over time
-fig, ax = plt.subplots()
-ax.plot(df["Date"], df["predicted_conversions"], label="Predicted")
-ax.plot(df["Date"], df["conversion"], label="Actual", alpha=0.5)
-ax.set_title("Predicted vs Actual Conversions")
-ax.set_xlabel("Date")
-ax.set_ylabel("Conversions")
-ax.legend()
-st.pyplot(fig)
-
-    # Contribution chart
-base_media = np.zeros_like(media_data)
-base_pred = model.predict(media=base_media).mean(axis=0)
-contribution = np.zeros_like(media_data, dtype=float)
-for i in range(len(media_cols)):
-    temp = np.zeros_like(media_data)
-    temp[:, i] = media_data[:, i]
-    pred_i = model.predict(media=temp).mean(axis=0)
-    contribution[:, i] = pred_i - base_pred
-
-fig2, ax2 = plt.subplots()
-for i, col in enumerate(media_cols):
-    ax2.plot(df["Date"], contribution[:, i], label=col.replace("_cost", ""))
-ax2.set_title("Media Channel Contribution to Conversions")
-ax2.set_xlabel("Date")
-ax2.set_ylabel("Estimated Contribution")
-ax2.legend()
-st.pyplot(fig2)
+            locked_total = sum(locked.values())
+            if locked_total > total_budget:
+                st.error("Locked spend exceeds total budget")
+            else:
+                progress_bar = st.progress(0.0)
+    
+                def _update(pct):
+                    progress_bar.progress(pct)
+    
+                solution, _, _ = find_optimal_budgets_with_locks(
+                    model,
+                    budget=total_budget,
+                    prices=np.ones(len(media_cols)),
+                    locked_spend=locked,
+                    progress_callback=_update,
+                )
+                progress_bar.empty()
+    
+                optimized_spend = np.round(solution.x.reshape(-1), 2)
+                final_alloc = {
+                    col: float(locked.get(i, optimized_spend[i]))
+                    for i, col in enumerate(media_cols)
+                }
+                future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
+                # ``model.predict`` returns a JAX array which cannot be directly cast
+                # to a Python ``float`` when it has a non-scalar shape. ``mean(axis=0)``
+                # yields an array with a single value, so we explicitly convert using
+                # ``np.asarray`` and ``item()`` to extract the scalar value.
+                future_pred = np.asarray(
+                    model.predict(media=future_media).mean(axis=0)
+                ).item()
+    
+                st.session_state["optimized_results"] = {
+                    "alloc": final_alloc,
+                    "future_pred": future_pred,
+                }
+    
+                st.experimental_rerun()
+    
+    if "optimized_results" in st.session_state:
+            st.write(
+                "Optimized Spend Allocation",
+                st.session_state["optimized_results"]["alloc"],
+            )
+            st.metric(
+                "Predicted Future Conversions",
+                st.session_state["optimized_results"]["future_pred"],
+            )
+    
+        # Plot predicted conversions over time
+    fig, ax = plt.subplots()
+    ax.plot(df["Date"], df["predicted_conversions"], label="Predicted")
+    ax.plot(df["Date"], df["conversion"], label="Actual", alpha=0.5)
+    ax.set_title("Predicted vs Actual Conversions")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Conversions")
+    ax.legend()
+    st.pyplot(fig)
+    
+        # Contribution chart
+    base_media = np.zeros_like(media_data)
+    base_pred = model.predict(media=base_media).mean(axis=0)
+    contribution = np.zeros_like(media_data, dtype=float)
+    for i in range(len(media_cols)):
+        temp = np.zeros_like(media_data)
+        temp[:, i] = media_data[:, i]
+        pred_i = model.predict(media=temp).mean(axis=0)
+        contribution[:, i] = pred_i - base_pred
+    
+    fig2, ax2 = plt.subplots()
+    for i, col in enumerate(media_cols):
+        ax2.plot(df["Date"], contribution[:, i], label=col.replace("_cost", ""))
+    ax2.set_title("Media Channel Contribution to Conversions")
+    ax2.set_xlabel("Date")
+    ax2.set_ylabel("Estimated Contribution")
+    ax2.legend()
+    st.pyplot(fig2)
