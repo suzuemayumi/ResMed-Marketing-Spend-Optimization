@@ -238,7 +238,9 @@ def _load_dataframe(uploaded_file) -> pd.DataFrame:
 
 
 @st.cache_resource(show_spinner=False)
-def _train_model(media_data: np.ndarray, target: np.ndarray, n_channels: int) -> lightweight_mmm.LightweightMMM:
+def _train_model(
+    media_data: np.ndarray, target: np.ndarray, n_channels: int
+) -> lightweight_mmm.LightweightMMM:
     """Fit and return a cached media mix model."""
     model = lightweight_mmm.LightweightMMM()
     model.fit(media=media_data, target=target, media_prior=np.ones(n_channels))
@@ -261,7 +263,9 @@ total_budget = st.sidebar.number_input(
 )
 
 # File uploader
-uploaded_file = st.file_uploader("Upload marketing data", type=["csv", "xlsx", "xls"])
+uploaded_file = st.file_uploader(
+    "Upload marketing data", type=["csv", "xlsx", "xls"]
+)
 
 if uploaded_file is not None:
     progress = st.progress(0.0)
@@ -287,7 +291,6 @@ if uploaded_file is not None:
     spend_ranges = {col: (df[col].min(), df[col].max()) for col in media_cols}
     diminish_points = {col: df[col].quantile(0.9) for col in media_cols}
 
-
     future_spend = {}
     st.session_state.setdefault("apply_optimized_to_widgets", False)
 
@@ -296,9 +299,8 @@ if uploaded_file is not None:
     # guard the widgets would overwrite any user adjustments because the
     # code executes on every rerun triggered by Streamlit when a widget
     # value changes.
-    if (
-        "optimized_results" in st.session_state
-        and st.session_state.get("apply_optimized_to_widgets")
+    if "optimized_results" in st.session_state and st.session_state.get(
+        "apply_optimized_to_widgets"
     ):
         for col in media_cols:
             alloc_val = st.session_state["optimized_results"]["alloc"][col]
@@ -318,7 +320,9 @@ if uploaded_file is not None:
         if lock_key not in st.session_state:
             st.session_state[lock_key] = False
 
-        max_val = float(max(total_budget, spend_ranges[col][1], df[col].iloc[-1]))
+        max_val = float(
+            max(total_budget, spend_ranges[col][1], df[col].iloc[-1])
+        )
         st.slider(
             f"{col_title} Spend",
             min_value=0.0,
@@ -352,7 +356,6 @@ if uploaded_file is not None:
             )
         future_spend[col] = val
 
-
     optimize_clicked = st.button("Optimize")
 
     if optimize_clicked:
@@ -379,12 +382,30 @@ if uploaded_file is not None:
             )
             progress_bar.empty()
 
-            optimized_spend = np.round(solution.x.reshape(-1), 2)
+            optimized_spend = solution.x.reshape(-1)
             final_alloc = {
                 col: float(locked.get(i, optimized_spend[i]))
                 for i, col in enumerate(media_cols)
             }
-            future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
+            current_total = sum(final_alloc.values())
+            diff = total_budget - current_total
+            if abs(diff) > 1e-6:
+                for i, col in enumerate(media_cols):
+                    if i not in locked:
+                        final_alloc[col] += diff
+                        break
+            display_alloc = {c: round(v, 2) for c, v in final_alloc.items()}
+            diff = round(total_budget - sum(display_alloc.values()), 2)
+            if abs(diff) >= 0.01:
+                for i, col in enumerate(media_cols):
+                    if i not in locked:
+                        display_alloc[col] = round(
+                            display_alloc[col] + diff, 2
+                        )
+                        break
+            future_media = np.array(
+                [final_alloc[c] for c in media_cols]
+            ).reshape(1, -1)
             # ``model.predict`` returns a JAX array which cannot be directly cast
             # to a Python ``float`` when it has a non-scalar shape. ``mean(axis=0)``
             # yields an array with a single value, so we explicitly convert using
@@ -394,7 +415,7 @@ if uploaded_file is not None:
             ).item()
 
             st.session_state["optimized_results"] = {
-                "alloc": final_alloc,
+                "alloc": display_alloc,
                 "future_pred": future_pred,
             }
             st.session_state["apply_optimized_to_widgets"] = True
@@ -404,7 +425,7 @@ if uploaded_file is not None:
             # the app works across versions.
             rerun = getattr(st, "experimental_rerun", st.rerun)
             rerun()
-    
+
     if "optimized_results" in st.session_state:
         st.write(
             "Optimized Spend Allocation",
@@ -437,7 +458,9 @@ if uploaded_file is not None:
 
     fig2, ax2 = plt.subplots()
     for i, col in enumerate(media_cols):
-        ax2.plot(df["Date"], contribution[:, i], label=col.replace("_cost", ""))
+        ax2.plot(
+            df["Date"], contribution[:, i], label=col.replace("_cost", "")
+        )
     ax2.set_title("Media Channel Contribution to Conversions")
     ax2.set_xlabel("Date")
     ax2.set_ylabel("Estimated Contribution")
