@@ -303,7 +303,9 @@ if uploaded_file is not None:
         "apply_optimized_to_widgets"
     ):
         for col in media_cols:
-            alloc_val = st.session_state["optimized_results"]["alloc"][col]
+            alloc_val = max(
+                0.0, st.session_state["optimized_results"]["alloc"][col]
+            )
             st.session_state[f"{col}_slider"] = alloc_val
             st.session_state[f"{col}_input"] = alloc_val
         st.session_state["apply_optimized_to_widgets"] = False
@@ -382,7 +384,7 @@ if uploaded_file is not None:
             )
             progress_bar.empty()
 
-            optimized_spend = solution.x.reshape(-1)
+            optimized_spend = np.maximum(solution.x.reshape(-1), 0)
             final_alloc = {
                 col: float(locked.get(i, optimized_spend[i]))
                 for i, col in enumerate(media_cols)
@@ -394,7 +396,8 @@ if uploaded_file is not None:
                     if i not in locked:
                         final_alloc[col] += diff
                         break
-            display_alloc = {c: round(v, 2) for c, v in final_alloc.items()}
+            final_alloc = {c: max(0.0, v) for c, v in final_alloc.items()}
+            display_alloc = {c: max(0.0, round(v, 2)) for c, v in final_alloc.items()}
             diff = round(total_budget - sum(display_alloc.values()), 2)
             if abs(diff) >= 0.01:
                 for i, col in enumerate(media_cols):
