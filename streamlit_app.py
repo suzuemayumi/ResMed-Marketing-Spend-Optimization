@@ -289,16 +289,22 @@ if uploaded_file is not None:
 
 
     future_spend = {}
+    st.session_state.setdefault("apply_optimized_to_widgets", False)
 
-    # If we have optimized spend allocations stored from a previous run,
-    # update the slider defaults before creating the widgets. Streamlit
-    # requires any session state modifications to occur prior to widget
-    # instantiation.
-    if "optimized_results" in st.session_state:
+    # If we have optimized spend allocations from the previous run, we
+    # update the slider defaults once on the next rerun. Without this
+    # guard the widgets would overwrite any user adjustments because the
+    # code executes on every rerun triggered by Streamlit when a widget
+    # value changes.
+    if (
+        "optimized_results" in st.session_state
+        and st.session_state.get("apply_optimized_to_widgets")
+    ):
         for col in media_cols:
             alloc_val = st.session_state["optimized_results"]["alloc"][col]
             st.session_state[f"{col}_slider"] = alloc_val
             st.session_state[f"{col}_input"] = alloc_val
+        st.session_state["apply_optimized_to_widgets"] = False
 
     for col in media_cols:
         col_title = col.replace("_cost", "").title()
@@ -346,68 +352,70 @@ if uploaded_file is not None:
             )
         future_spend[col] = val
 
-    optimize_clicked = st.button("Optimize")
-    
-    if optimize_clicked:
-            locked = {
-                i: future_spend[col]
-                for i, col in enumerate(media_cols)
-                if st.session_state.get(f"{col}_lock")
-            }
-            locked_total = sum(locked.values())
-            if locked_total > total_budget:
-                st.error("Locked spend exceeds total budget")
-            else:
-                progress_bar = st.progress(0.0)
-    
-                def _update(pct):
-                    progress_bar.progress(pct)
-    
-                solution, _, _ = find_optimal_budgets_with_locks(
-                    model,
-                    budget=total_budget,
-                    prices=np.ones(len(media_cols)),
-                    locked_spend=locked,
-                    progress_callback=_update,
-                )
-                progress_bar.empty()
-    
-                optimized_spend = np.round(solution.x.reshape(-1), 2)
-                final_alloc = {
-                    col: float(locked.get(i, optimized_spend[i]))
-                    for i, col in enumerate(media_cols)
-                }
-                future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
-                # ``model.predict`` returns a JAX array which cannot be directly cast
-                # to a Python ``float`` when it has a non-scalar shape. ``mean(axis=0)``
-                # yields an array with a single value, so we explicitly convert using
-                # ``np.asarray`` and ``item()`` to extract the scalar value.
-                future_pred = np.asarray(
-                    model.predict(media=future_media).mean(axis=0)
-                ).item()
-    
-                st.session_state["optimized_results"] = {
-                    "alloc": final_alloc,
-                    "future_pred": future_pred,
-                }
 
-                # ``st.experimental_rerun`` was deprecated in Streamlit 1.27 in
-                # favor of ``st.rerun``. Use whichever attribute is available so
-                # the app works across versions.
-                rerun = getattr(st, "experimental_rerun", st.rerun)
-                rerun()
+    optimize_clicked = st.button("Optimize")
+
+    if optimize_clicked:
+        locked = {
+            i: future_spend[col]
+            for i, col in enumerate(media_cols)
+            if st.session_state.get(f"{col}_lock")
+        }
+        locked_total = sum(locked.values())
+        if locked_total > total_budget:
+            st.error("Locked spend exceeds total budget")
+        else:
+            progress_bar = st.progress(0.0)
+
+            def _update(pct):
+                progress_bar.progress(pct)
+
+            solution, _, _ = find_optimal_budgets_with_locks(
+                model,
+                budget=total_budget,
+                prices=np.ones(len(media_cols)),
+                locked_spend=locked,
+                progress_callback=_update,
+            )
+            progress_bar.empty()
+
+            optimized_spend = np.round(solution.x.reshape(-1), 2)
+            final_alloc = {
+                col: float(locked.get(i, optimized_spend[i]))
+                for i, col in enumerate(media_cols)
+            }
+            future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
+            # ``model.predict`` returns a JAX array which cannot be directly cast
+            # to a Python ``float`` when it has a non-scalar shape. ``mean(axis=0)``
+            # yields an array with a single value, so we explicitly convert using
+            # ``np.asarray`` and ``item()`` to extract the scalar value.
+            future_pred = np.asarray(
+                model.predict(media=future_media).mean(axis=0)
+            ).item()
+
+            st.session_state["optimized_results"] = {
+                "alloc": final_alloc,
+                "future_pred": future_pred,
+            }
+            st.session_state["apply_optimized_to_widgets"] = True
+
+            # ``st.experimental_rerun`` was deprecated in Streamlit 1.27 in
+            # favor of ``st.rerun``. Use whichever attribute is available so
+            # the app works across versions.
+            rerun = getattr(st, "experimental_rerun", st.rerun)
+            rerun()
     
     if "optimized_results" in st.session_state:
-            st.write(
-                "Optimized Spend Allocation",
-                st.session_state["optimized_results"]["alloc"],
-            )
-            st.metric(
-                "Predicted Future Conversions",
-                st.session_state["optimized_results"]["future_pred"],
-            )
-    
-        # Plot predicted conversions over time
+        st.write(
+            "Optimized Spend Allocation",
+            st.session_state["optimized_results"]["alloc"],
+        )
+        st.metric(
+            "Predicted Future Conversions",
+            st.session_state["optimized_results"]["future_pred"],
+        )
+
+    # Plot predicted conversions over time
     fig, ax = plt.subplots()
     ax.plot(df["Date"], df["predicted_conversions"], label="Predicted")
     ax.plot(df["Date"], df["conversion"], label="Actual", alpha=0.5)
@@ -416,8 +424,8 @@ if uploaded_file is not None:
     ax.set_ylabel("Conversions")
     ax.legend()
     st.pyplot(fig)
-    
-        # Contribution chart
+
+    # Contribution chart
     base_media = np.zeros_like(media_data)
     base_pred = model.predict(media=base_media).mean(axis=0)
     contribution = np.zeros_like(media_data, dtype=float)
@@ -426,7 +434,7 @@ if uploaded_file is not None:
         temp[:, i] = media_data[:, i]
         pred_i = model.predict(media=temp).mean(axis=0)
         contribution[:, i] = pred_i - base_pred
-    
+
     fig2, ax2 = plt.subplots()
     for i, col in enumerate(media_cols):
         ax2.plot(df["Date"], contribution[:, i], label=col.replace("_cost", ""))
