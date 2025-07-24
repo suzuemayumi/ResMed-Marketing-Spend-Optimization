@@ -390,8 +390,12 @@ if uploaded_file is not None:
                     "alloc": final_alloc,
                     "future_pred": future_pred,
                 }
-    
-                st.experimental_rerun()
+
+                # ``st.experimental_rerun`` was deprecated in Streamlit 1.27 in
+                # favor of ``st.rerun``. Use whichever attribute is available so
+                # the app works across versions.
+                rerun = getattr(st, "experimental_rerun", st.rerun)
+                rerun()
     
     if "optimized_results" in st.session_state:
             st.write(
