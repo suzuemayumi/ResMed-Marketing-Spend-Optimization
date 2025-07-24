@@ -332,58 +332,21 @@ if uploaded_file is not None:
             disabled=st.session_state[lock_key],
         )
         st.checkbox(f"Lock {col_title}", key=lock_key)
-    with st.form("optimization_form"):
-            st.subheader("Adjust Future Spend")
-            future_spend = {}
-            for col in media_cols:
-                col_title = col.replace("_cost", "").title()
-                slider_key = f"{col}_slider"
-                input_key = f"{col}_input"
-                lock_key = f"{col}_lock"
-                if slider_key not in st.session_state:
-                    st.session_state[slider_key] = float(df[col].iloc[-1])
-                if input_key not in st.session_state:
-                    st.session_state[input_key] = float(df[col].iloc[-1])
-                if lock_key not in st.session_state:
-                    st.session_state[lock_key] = False
-    
-                max_val = float(max(total_budget, spend_ranges[col][1], df[col].iloc[-1]))
-                st.slider(
-                    f"{col_title} Spend",
-                    min_value=0.0,
-                    max_value=max_val,
-                    value=st.session_state[slider_key],
-                    key=slider_key,
-                    on_change=_sync_from_slider,
-                    args=(slider_key, input_key),
-                    disabled=st.session_state[lock_key],
-                )
-                st.number_input(
-                    f"{col_title} Spend Value",
-                    min_value=0.0,
-                    max_value=max_val,
-                    value=st.session_state[slider_key],
-                    key=input_key,
-                    on_change=_sync_from_input,
-                    args=(slider_key, input_key),
-                    disabled=st.session_state[lock_key],
-                )
-                st.checkbox(f"Lock {col_title}", key=lock_key)
-    
-                val = st.session_state[slider_key]
-                if val < spend_ranges[col][0] or val > spend_ranges[col][1]:
-                    st.warning(
-                        f"{col_title} spend outside historical range "
-                        f"({spend_ranges[col][0]:.2f} - {spend_ranges[col][1]:.2f})"
-                    )
-                elif val > diminish_points[col]:
-                    st.info(
-                        f"{col_title} spend exceeds estimated diminishing return "
-                        f"point ({diminish_points[col]:.2f})"
-                    )
-                future_spend[col] = val
-    
-            optimize_clicked = st.form_submit_button("Optimize")
+
+        val = st.session_state[slider_key]
+        if val < spend_ranges[col][0] or val > spend_ranges[col][1]:
+            st.warning(
+                f"{col_title} spend outside historical range "
+                f"({spend_ranges[col][0]:.2f} - {spend_ranges[col][1]:.2f})"
+            )
+        elif val > diminish_points[col]:
+            st.info(
+                f"{col_title} spend exceeds estimated diminishing return "
+                f"point ({diminish_points[col]:.2f})"
+            )
+        future_spend[col] = val
+
+    optimize_clicked = st.button("Optimize")
     
     if optimize_clicked:
             locked = {
