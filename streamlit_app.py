@@ -393,9 +393,7 @@ if uploaded_file is not None:
                 for i, col in enumerate(media_cols)
             }
 
-            # Clip negative values before adjusting for rounding errors
-            final_alloc = {c: max(0.0, v) for c, v in final_alloc.items()}
-
+            # Ensure spend sums to the total budget before rounding
             current_total = sum(final_alloc.values())
             diff = total_budget - current_total
             if abs(diff) > 1e-6:
@@ -404,22 +402,24 @@ if uploaded_file is not None:
                         final_alloc[col] += diff
                         break
 
-            display_alloc = {c: max(0.0, round(v, 2)) for c, v in final_alloc.items()}
+            # If adjustment pushed a channel negative, clip and redistribute
+            negatives = [c for c, v in final_alloc.items() if v < 0 and c not in locked]
+            if negatives:
+                for c in negatives:
+                    final_alloc[c] = 0.0
+                diff2 = total_budget - sum(final_alloc.values())
+                if abs(diff2) > 1e-6:
+                    for i, col in enumerate(media_cols):
+                        if i not in locked and final_alloc[col] + diff2 >= 0:
+                            final_alloc[col] += diff2
+                            break
+
+            display_alloc = {c: round(v, 2) for c, v in final_alloc.items()}
             diff = round(total_budget - sum(display_alloc.values()), 2)
             if abs(diff) >= 0.01:
                 for i, col in enumerate(media_cols):
-                    if i not in locked:
-                        display_alloc[col] = max(
-                            0.0, round(display_alloc[col] + diff, 2)
-                        )
-                        break
-            diff = round(total_budget - sum(display_alloc.values()), 2)
-            if abs(diff) >= 0.01:
-                for i, col in enumerate(media_cols):
-                    if i not in locked:
-                        display_alloc[col] = max(
-                            0.0, round(display_alloc[col] + diff, 2)
-                        )
+                    if i not in locked and display_alloc[col] + diff >= 0:
+                        display_alloc[col] = round(display_alloc[col] + diff, 2)
                         break
             future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
             # ``model.predict`` returns a JAX array which cannot be directly cast
