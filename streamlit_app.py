@@ -241,11 +241,7 @@ def _load_dataframe(uploaded_file) -> pd.DataFrame:
     df = df.sort_values("Date")
     numeric_cols = df.select_dtypes(include="number").columns
     df[numeric_cols] = (
-        df[numeric_cols]
-        .replace(0, np.nan)
-        .interpolate(method="linear")
-        .bfill()
-        .ffill()
+        df[numeric_cols].replace(0, np.nan).interpolate(method="linear").bfill().ffill()
     )
     return df
 
@@ -276,9 +272,7 @@ total_budget = st.sidebar.number_input(
 )
 
 # File uploader
-uploaded_file = st.file_uploader(
-    "Upload marketing data", type=["csv", "xlsx", "xls"]
-)
+uploaded_file = st.file_uploader("Upload marketing data", type=["csv", "xlsx", "xls"])
 
 if uploaded_file is not None:
     progress = st.progress(0.0)
@@ -316,9 +310,7 @@ if uploaded_file is not None:
         "apply_optimized_to_widgets"
     ):
         for col in media_cols:
-            alloc_val = max(
-                0.0, st.session_state["optimized_results"]["alloc"][col]
-            )
+            alloc_val = max(0.0, st.session_state["optimized_results"]["alloc"][col])
             st.session_state[f"{col}_slider"] = alloc_val
             st.session_state[f"{col}_input"] = alloc_val
         st.session_state["apply_optimized_to_widgets"] = False
@@ -335,9 +327,7 @@ if uploaded_file is not None:
         if lock_key not in st.session_state:
             st.session_state[lock_key] = False
 
-        max_val = float(
-            max(total_budget, spend_ranges[col][1], df[col].iloc[-1])
-        )
+        max_val = float(max(total_budget, spend_ranges[col][1], df[col].iloc[-1]))
         st.slider(
             f"{col_title} Spend",
             min_value=0.0,
@@ -402,6 +392,10 @@ if uploaded_file is not None:
                 col: float(locked.get(i, optimized_spend[i]))
                 for i, col in enumerate(media_cols)
             }
+
+            # Clip negative values before adjusting for rounding errors
+            final_alloc = {c: max(0.0, v) for c, v in final_alloc.items()}
+
             current_total = sum(final_alloc.values())
             diff = total_budget - current_total
             if abs(diff) > 1e-6:
@@ -409,7 +403,7 @@ if uploaded_file is not None:
                     if i not in locked:
                         final_alloc[col] += diff
                         break
-            final_alloc = {c: max(0.0, v) for c, v in final_alloc.items()}
+
             display_alloc = {c: max(0.0, round(v, 2)) for c, v in final_alloc.items()}
             diff = round(total_budget - sum(display_alloc.values()), 2)
             if abs(diff) >= 0.01:
@@ -427,9 +421,7 @@ if uploaded_file is not None:
                             0.0, round(display_alloc[col] + diff, 2)
                         )
                         break
-            future_media = np.array(
-                [final_alloc[c] for c in media_cols]
-            ).reshape(1, -1)
+            future_media = np.array([final_alloc[c] for c in media_cols]).reshape(1, -1)
             # ``model.predict`` returns a JAX array which cannot be directly cast
             # to a Python ``float`` when it has a non-scalar shape. ``mean(axis=0)``
             # yields an array with a single value, so we explicitly convert using
@@ -482,9 +474,7 @@ if uploaded_file is not None:
 
     fig2, ax2 = plt.subplots()
     for i, col in enumerate(media_cols):
-        ax2.plot(
-            df["Date"], contribution[:, i], label=col.replace("_cost", "")
-        )
+        ax2.plot(df["Date"], contribution[:, i], label=col.replace("_cost", ""))
     ax2.set_title("Media Channel Contribution to Conversions")
     ax2.set_xlabel("Date")
     ax2.set_ylabel("Estimated Contribution")
