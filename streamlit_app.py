@@ -109,7 +109,14 @@ def find_optimal_budgets_with_locks(
     solver_step_size=1.4901161193847656e-08,
     progress_callback=None,
 ):
-    """Wrapper around optimize_media.find_optimal_budgets that supports locks.
+    """Run the allocation optimization used by the manual tool.
+
+    This helper wraps ``optimize_media.find_optimal_budgets`` so that the
+    Streamlit interface can lock specific channels when users experiment with
+    manual spend values. It builds per-channel bounds, fixes locked channels to
+    their chosen spend, and then maximizes the predicted KPI using SciPy's SLSQP
+    solver. Progress updates are forwarded to ``progress_callback`` so the UI can
+    display a progress bar.
 
     Parameters
     ----------
