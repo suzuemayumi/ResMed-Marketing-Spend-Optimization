@@ -238,7 +238,7 @@ def _load_dataframe(uploaded_file) -> pd.DataFrame:
     """Load the uploaded CSV or Excel file and sort by date.
 
     Zero values in numeric columns are treated as missing data and
-    replaced using linear interpolation across the date sequence.
+    replaced using forward and backward fill across the date sequence.
     """
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
@@ -248,7 +248,10 @@ def _load_dataframe(uploaded_file) -> pd.DataFrame:
     df = df.sort_values("Date")
     numeric_cols = df.select_dtypes(include="number").columns
     df[numeric_cols] = (
-        df[numeric_cols].replace(0, np.nan).interpolate(method="linear").bfill().ffill()
+        df[numeric_cols]
+        .replace(0, np.nan)
+        .fillna(method="ffill")
+        .fillna(method="bfill")
     )
     return df
 
