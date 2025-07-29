@@ -45,6 +45,16 @@ other unlocked channels.
 Progress bars appear while your data is loaded and when optimization runs so
 you can track the current status.
 
+## Allocation Model Behind the Manual Tool
+
+The manual optimization tool relies on the same approach as
+`lightweight_mmm.optimize_media.find_optimal_budgets`. It formulates an
+optimization problem that distributes the total budget across all unlocked
+channels while keeping any locked channels fixed to their specified spend. The
+objective maximizes the KPI predicted by the trained media mix model using
+SciPy's SLSQP solver. Bounds derived from historical spend values prevent the
+optimizer from allocating unrealistic amounts to a channel.
+
 ## Data Requirements
 
 The app expects a CSV or Excel file containing the following columns:
