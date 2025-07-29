@@ -415,6 +415,14 @@ if uploaded_file is not None:
             if abs(diff) >= 0.01:
                 for i, col in enumerate(media_cols):
                     if i not in locked:
+                        display_alloc[col] = max(
+                            0.0, round(display_alloc[col] + diff, 2)
+                        )
+                        break
+            diff = round(total_budget - sum(display_alloc.values()), 2)
+            if abs(diff) >= 0.01:
+                for i, col in enumerate(media_cols):
+                    if i not in locked:
                         display_alloc[col] = round(
                             display_alloc[col] + diff, 2
                         )
