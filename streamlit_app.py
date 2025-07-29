@@ -228,13 +228,26 @@ def find_optimal_budgets_with_locks(
 
 @st.cache_data(show_spinner=False)
 def _load_dataframe(uploaded_file) -> pd.DataFrame:
-    """Load the uploaded CSV or Excel file and sort by date."""
+    """Load the uploaded CSV or Excel file and sort by date.
+
+    Zero values in numeric columns are treated as missing data and
+    replaced using linear interpolation across the date sequence.
+    """
     if uploaded_file.name.endswith(".csv"):
         df = pd.read_csv(uploaded_file)
     else:
         df = pd.read_excel(uploaded_file)
     df["Date"] = pd.to_datetime(df["Date"])
-    return df.sort_values("Date")
+    df = df.sort_values("Date")
+    numeric_cols = df.select_dtypes(include="number").columns
+    df[numeric_cols] = (
+        df[numeric_cols]
+        .replace(0, np.nan)
+        .interpolate(method="linear")
+        .bfill()
+        .ffill()
+    )
+    return df
 
 
 @st.cache_resource(show_spinner=False)
