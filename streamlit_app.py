@@ -269,17 +269,17 @@ def _train_model(
 def _calculate_statistics(actual: np.ndarray, predicted: np.ndarray) -> dict:
     """Return basic evaluation statistics for predictions."""
     residuals = actual - predicted
-    ss_res = np.sum(residuals ** 2)
+    ss_res = np.sum(residuals**2)
     ss_tot = np.sum((actual - np.mean(actual)) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot != 0 else np.nan
-    rmse = float(np.sqrt(np.mean(residuals ** 2)))
+    rmse = float(np.sqrt(np.mean(residuals**2)))
     if len(actual) > 1:
         _t, p_value = stats.ttest_rel(actual, predicted)
     else:
         p_value = np.nan
     r2 = float(np.nan_to_num(r2))
     rmse = float(np.nan_to_num(rmse))
-    p_value = float(np.nan_to_num(p_value))
+    p_value = float(p_value) if not np.isnan(p_value) else np.nan
     return {"r2": r2, "rmse": rmse, "p_value": p_value}
 
 
@@ -289,16 +289,22 @@ def _validation_metrics(
     """Train on a holdout split and compute validation statistics."""
     n = len(target)
     if n < 2:
-        return {"r2": 0.0, "rmse": 0.0, "p_value": 0.0}
+        return {"r2": 0.0, "rmse": 0.0, "p_value": np.nan}
     split = max(1, int(n * (1 - test_size)))
     train_media, test_media = media_data[:split], media_data[split:]
     train_target, test_target = target[:split], target[split:]
     model = _train_model(train_media, train_target, n_channels)
     if len(test_target) == 0:
-        return {"r2": 0.0, "rmse": 0.0, "p_value": 0.0}
+        return {"r2": 0.0, "rmse": 0.0, "p_value": np.nan}
     preds = model.predict(media=test_media).mean(axis=0)
     metrics = _calculate_statistics(test_target, np.asarray(preds))
-    return {k: float(np.nan_to_num(v)) for k, v in metrics.items()}
+    return {
+        "r2": float(np.nan_to_num(metrics["r2"])),
+        "rmse": float(np.nan_to_num(metrics["rmse"])),
+        "p_value": (
+            float(metrics["p_value"]) if not np.isnan(metrics["p_value"]) else np.nan
+        ),
+    }
 
 
 # Page configuration
@@ -483,7 +489,9 @@ if uploaded_file is not None:
             optimized_media_full = np.tile(future_media, (len(media_data), 1))
             opt_predictions = model.predict(media=optimized_media_full).mean(axis=0)
             opt_train_stats = _calculate_statistics(target, np.asarray(opt_predictions))
-            opt_val_stats = _validation_metrics(optimized_media_full, target, len(media_cols))
+            opt_val_stats = _validation_metrics(
+                optimized_media_full, target, len(media_cols)
+            )
 
             st.session_state["optimized_results"] = {
                 "alloc": display_alloc,
