@@ -39,6 +39,14 @@ streamlit_stub.metric = lambda *a, **k: None
 streamlit_stub.rerun = lambda *a, **k: None
 streamlit_stub.experimental_rerun = lambda *a, **k: None
 streamlit_stub.file_uploader = lambda *a, **k: None
+class _DummyContext:
+    def __enter__(self):
+        return None
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+streamlit_stub.expander = lambda *a, **k: _DummyContext()
 sys.modules.setdefault("streamlit", streamlit_stub)
 
 # lightweight_mmm stubs
