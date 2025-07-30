@@ -312,6 +312,15 @@ st.set_page_config(page_title="Marketing Spend Optimization")
 
 st.title("Marketing Spend Optimization")
 
+# Brief summary of the underlying optimization approach
+with st.expander("How the Model Works"):
+    st.markdown(
+        "The manual optimization tool mirrors `lightweight_mmm.optimize_media.find_optimal_budgets`. "
+        "SciPy's SLSQP solver distributes the total budget across unlocked channels "
+        "while keeping any locked channels fixed. The objective maximizes the KPI predicted "
+        "by the media mix model, and bounds based on historical spend keep allocations realistic."
+    )
+
 # Sidebar instructions and budget input
 st.sidebar.header("Simulation Settings")
 st.sidebar.write(
