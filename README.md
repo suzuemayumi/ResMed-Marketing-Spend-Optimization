@@ -70,3 +70,7 @@ Make sure your data file includes these columns so that the application can load
 ## Testing
 
 There are currently no unit tests in this repository. However, you can run `pytest` to verify that the Python environment is correctly configured.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
