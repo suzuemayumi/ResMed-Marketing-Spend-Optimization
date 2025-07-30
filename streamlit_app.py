@@ -277,7 +277,10 @@ def _calculate_statistics(actual: np.ndarray, predicted: np.ndarray) -> dict:
         _t, p_value = stats.ttest_rel(actual, predicted)
     else:
         p_value = np.nan
-    return {"r2": float(r2), "rmse": rmse, "p_value": float(p_value)}
+    r2 = float(np.nan_to_num(r2))
+    rmse = float(np.nan_to_num(rmse))
+    p_value = float(np.nan_to_num(p_value))
+    return {"r2": r2, "rmse": rmse, "p_value": p_value}
 
 
 def _validation_metrics(
@@ -286,15 +289,16 @@ def _validation_metrics(
     """Train on a holdout split and compute validation statistics."""
     n = len(target)
     if n < 2:
-        return {"r2": np.nan, "rmse": np.nan, "p_value": np.nan}
+        return {"r2": 0.0, "rmse": 0.0, "p_value": 0.0}
     split = max(1, int(n * (1 - test_size)))
     train_media, test_media = media_data[:split], media_data[split:]
     train_target, test_target = target[:split], target[split:]
     model = _train_model(train_media, train_target, n_channels)
     if len(test_target) == 0:
-        return {"r2": np.nan, "rmse": np.nan, "p_value": np.nan}
+        return {"r2": 0.0, "rmse": 0.0, "p_value": 0.0}
     preds = model.predict(media=test_media).mean(axis=0)
-    return _calculate_statistics(test_target, np.asarray(preds))
+    metrics = _calculate_statistics(test_target, np.asarray(preds))
+    return {k: float(np.nan_to_num(v)) for k, v in metrics.items()}
 
 
 # Page configuration
@@ -475,9 +479,17 @@ if uploaded_file is not None:
                 model.predict(media=future_media).mean(axis=0)
             ).item()
 
+            # Metrics based on the optimized spend applied across all periods
+            optimized_media_full = np.tile(future_media, (len(media_data), 1))
+            opt_predictions = model.predict(media=optimized_media_full).mean(axis=0)
+            opt_train_stats = _calculate_statistics(target, np.asarray(opt_predictions))
+            opt_val_stats = _validation_metrics(optimized_media_full, target, len(media_cols))
+
             st.session_state["optimized_results"] = {
                 "alloc": display_alloc,
                 "future_pred": future_pred,
+                "train_stats": opt_train_stats,
+                "val_stats": opt_val_stats,
             }
             st.session_state["apply_optimized_to_widgets"] = True
 
@@ -504,13 +516,23 @@ if uploaded_file is not None:
             st.session_state["optimized_results"]["future_pred"],
         )
 
+    metrics_train = train_stats
+    metrics_val = val_stats
+    if "optimized_results" in st.session_state:
+        metrics_train = st.session_state["optimized_results"].get(
+            "train_stats", metrics_train
+        )
+        metrics_val = st.session_state["optimized_results"].get(
+            "val_stats", metrics_val
+        )
+
     st.subheader("Model Metrics")
-    st.write(f"R\u00b2: {train_stats['r2']:.4f}")
-    st.write(f"RMSE: {train_stats['rmse']:.2f}")
-    st.write(f"Paired t-test p-value: {train_stats['p_value']:.4f}")
-    st.write(f"Validation R\u00b2: {val_stats['r2']:.4f}")
-    st.write(f"Validation RMSE: {val_stats['rmse']:.2f}")
-    st.write(f"Validation p-value: {val_stats['p_value']:.4f}")
+    st.write(f"R\u00b2: {metrics_train['r2']:.4f}")
+    st.write(f"RMSE: {metrics_train['rmse']:.2f}")
+    st.write(f"Paired t-test p-value: {metrics_train['p_value']:.4f}")
+    st.write(f"Validation R\u00b2: {metrics_val['r2']:.4f}")
+    st.write(f"Validation RMSE: {metrics_val['rmse']:.2f}")
+    st.write(f"Validation p-value: {metrics_val['p_value']:.4f}")
 
     # Plot predicted conversions over time
     fig, ax = plt.subplots()
