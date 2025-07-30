@@ -65,7 +65,7 @@ The app expects a CSV or Excel file containing the following columns:
 - `video_cost`
 - `meta_cost`
 
-Make sure your data file includes these columns so that the application can load and visualize the marketing spend correctly. Any zero values in numeric columns are treated as missing data and filled using forward and backward fill across the date sequence.
+Make sure your data file includes these columns so that the application can load and visualize the marketing spend correctly. Any zero values in numeric columns are treated as missing data and filled using linear interpolation across the date sequence. Remaining gaps fall back to the column mean so all inputs stay positive.
 
 ## Testing
 
