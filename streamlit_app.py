@@ -315,10 +315,17 @@ st.title("Marketing Spend Optimization")
 # Brief summary of the underlying optimization approach
 with st.expander("How the Model Works"):
     st.markdown(
-        "The manual optimization tool mirrors `lightweight_mmm.optimize_media.find_optimal_budgets`. "
-        "SciPy's SLSQP solver distributes the total budget across unlocked channels "
-        "while keeping any locked channels fixed. The objective maximizes the KPI predicted "
-        "by the media mix model, and bounds based on historical spend keep allocations realistic."
+        "The app first trains a Bayesian media mix model on your historical data"
+        " to learn how each marketing channel contributes to the target"
+        " conversion metric. Once the model is fit it can predict conversions for"
+        " any hypothetical spend scenario.\n\n"
+        "When you click **Optimize**, a modified version of "
+        "`lightweight_mmm.optimize_media.find_optimal_budgets` searches for the"
+        " spend allocation that maximizes predicted conversions. SciPy's SLSQP"
+        " solver redistributes the total budget across all unlocked channels while"
+        " keeping locked channels fixed. Bounds based on each channel's historical"
+        " minimum and maximum spend ensure the solution remains realistic. Progress"
+        " updates are shown in the status bar until convergence."
     )
 
 # Sidebar instructions and budget input
