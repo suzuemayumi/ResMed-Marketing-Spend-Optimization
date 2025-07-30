@@ -346,6 +346,17 @@ if uploaded_file is not None:
     df = _load_dataframe(uploaded_file)
     progress.progress(0.4)
 
+    # Reset widget defaults when a new file is uploaded
+    file_id = uploaded_file.name
+    if st.session_state.get("current_file") != file_id:
+        st.session_state["current_file"] = file_id
+        for col in ["search_cost", "video_cost", "meta_cost"]:
+            st.session_state[f"{col}_slider"] = 0.0
+            st.session_state[f"{col}_input"] = 0.0
+            st.session_state[f"{col}_lock"] = False
+        st.session_state.pop("optimized_results", None)
+        st.session_state["apply_optimized_to_widgets"] = False
+
     st.subheader("Raw Data")
     st.write(df.head())
 
