@@ -100,3 +100,4 @@ def test_load_dataframe_fills_zero_values():
 
     numeric_cols = result.select_dtypes(include="number").columns
     assert (result[numeric_cols] == 0).sum().sum() == 0
+    assert (result[numeric_cols] > 0).all().all()
