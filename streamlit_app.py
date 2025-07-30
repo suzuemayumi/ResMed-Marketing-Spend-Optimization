@@ -448,8 +448,15 @@ if uploaded_file is not None:
 
             # ``st.experimental_rerun`` was deprecated in Streamlit 1.27 in
             # favor of ``st.rerun``. Use whichever attribute is available so
-            # the app works across versions.
-            rerun = getattr(st, "experimental_rerun", st.rerun)
+            # the app works across versions. ``getattr`` must not evaluate a
+            # missing attribute, so check for each explicitly.
+            rerun = getattr(st, "rerun", None)
+            if rerun is None:
+                rerun = getattr(st, "experimental_rerun", None)
+            if rerun is None:
+                raise RuntimeError(
+                    "Streamlit does not provide a rerun function in this version"
+                )
             rerun()
 
     if "optimized_results" in st.session_state:
