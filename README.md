@@ -11,6 +11,9 @@ This repository contains a lightweight Streamlit application for exploring marke
    releases of `lightweight-mmm` call `jnp.where` with keyword arguments, which
    is incompatible with JAX 0.4+. The Streamlit app includes a small monkey patch
    so you do not need to downgrade JAX.
+- SciPy **1.11+** is required when using JAX 0.4.19. If you see an error like
+  `AttributeError: module 'scipy.linalg' has no attribute 'tril'`, upgrade with
+  `pip install --upgrade "scipy>=1.11"`.
 ## Installation
 
 Create and activate a virtual environment, then install the dependencies:
