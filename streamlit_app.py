@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from lightweight_mmm import lightweight_mmm, optimize_media
 from lightweight_mmm import media_transforms, preprocessing
-from scipy import optimize
+from scipy import optimize, stats
 import jax.numpy as jnp
 
 
@@ -266,6 +266,37 @@ def _train_model(
     return model
 
 
+def _calculate_statistics(actual: np.ndarray, predicted: np.ndarray) -> dict:
+    """Return basic evaluation statistics for predictions."""
+    residuals = actual - predicted
+    ss_res = np.sum(residuals ** 2)
+    ss_tot = np.sum((actual - np.mean(actual)) ** 2)
+    r2 = 1 - ss_res / ss_tot if ss_tot != 0 else np.nan
+    rmse = float(np.sqrt(np.mean(residuals ** 2)))
+    if len(actual) > 1:
+        _t, p_value = stats.ttest_rel(actual, predicted)
+    else:
+        p_value = np.nan
+    return {"r2": float(r2), "rmse": rmse, "p_value": float(p_value)}
+
+
+def _validation_metrics(
+    media_data: np.ndarray, target: np.ndarray, n_channels: int, test_size: float = 0.2
+) -> dict:
+    """Train on a holdout split and compute validation statistics."""
+    n = len(target)
+    if n < 2:
+        return {"r2": np.nan, "rmse": np.nan, "p_value": np.nan}
+    split = max(1, int(n * (1 - test_size)))
+    train_media, test_media = media_data[:split], media_data[split:]
+    train_target, test_target = target[:split], target[split:]
+    model = _train_model(train_media, train_target, n_channels)
+    if len(test_target) == 0:
+        return {"r2": np.nan, "rmse": np.nan, "p_value": np.nan}
+    preds = model.predict(media=test_media).mean(axis=0)
+    return _calculate_statistics(test_target, np.asarray(preds))
+
+
 # Page configuration
 st.set_page_config(page_title="Marketing Spend Optimization")
 
@@ -302,6 +333,10 @@ if uploaded_file is not None:
 
     predictions = model.predict(media=media_data).mean(axis=0)
     df["predicted_conversions"] = predictions
+
+    train_stats = _calculate_statistics(target, np.asarray(predictions))
+    val_stats = _validation_metrics(media_data, target, len(media_cols))
+
     progress.progress(1.0)
     progress.empty()
 
@@ -468,6 +503,14 @@ if uploaded_file is not None:
             "Predicted Future Conversions",
             st.session_state["optimized_results"]["future_pred"],
         )
+
+    st.subheader("Model Metrics")
+    st.write(f"R\u00b2: {train_stats['r2']:.4f}")
+    st.write(f"RMSE: {train_stats['rmse']:.2f}")
+    st.write(f"Paired t-test p-value: {train_stats['p_value']:.4f}")
+    st.write(f"Validation R\u00b2: {val_stats['r2']:.4f}")
+    st.write(f"Validation RMSE: {val_stats['rmse']:.2f}")
+    st.write(f"Validation p-value: {val_stats['p_value']:.4f}")
 
     # Plot predicted conversions over time
     fig, ax = plt.subplots()
